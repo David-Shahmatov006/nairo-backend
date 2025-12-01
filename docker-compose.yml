@@ -1,0 +1,36 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: nairo_backend
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nairo_backend
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - nairo-back
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: nairo_admin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    networks:
+      - nairo-back
+
+volumes:
+  postgres_data:
+
+networks:
+  nairo-back:
+    driver: bridge
