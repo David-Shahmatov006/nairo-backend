@@ -40,7 +40,6 @@ export class AuthService {
 
     const hashedPass = await bcrypt.hash(dto.password, 10);
 
-    // interests
     const interests: Interest[] = [];
     for (const name of dto.interests) {
       let interest = await this.interestRepo.findOneBy({ name });
@@ -74,7 +73,6 @@ export class AuthService {
   async login(dto: LoginDto) {
     const user = await this.userRepo.findOne({
       where: { email: dto.email },
-      relations: ['interests'],
     });
 
     if (!user) {
