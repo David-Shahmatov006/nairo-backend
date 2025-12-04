@@ -4,6 +4,8 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinTable,
+  ManyToMany,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
@@ -23,8 +25,9 @@ export class Post {
   @Column()
   description: string;
 
-  @Column({ default: 0 })
-  likes: number;
+  @ManyToMany(() => User, (user) => user.likedPosts, { eager: false })
+  @JoinTable()
+  likedBy: User[];
 
   @Column({ default: 0 })
   savings: number;

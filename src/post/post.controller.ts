@@ -8,6 +8,7 @@ import {
   UseGuards,
   Get,
   Param,
+  Delete,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -47,6 +48,13 @@ export class PostController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Delete(':id')
+  async deletePost(@Req() req, @Param('id') postId: string) {
+    const userId = req.user.id;
+    return this.postService.deletePost(postId, userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('/saved')
   async getSavedPosts(@Req() req) {
     return this.postService.getSavedPosts(req.user.id);
@@ -58,9 +66,11 @@ export class PostController {
     return this.postService.getRandomPosts(req.user.id);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('/user/:id')
-  async getUserPosts(@Param('id') id: string) {
-    return this.postService.getUserPosts(id);
+  async getUserPosts(@Param('id') userId: string, @Req() req) {
+    const currentUserId = req.user.id;
+    return this.postService.getUserPosts(userId, currentUserId);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -73,5 +83,11 @@ export class PostController {
   @Post('/:id/toggle-save')
   async toggleSave(@Param('id') postId: string, @Req() req) {
     return this.postService.toggleSavePost(req.user.id, postId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/like')
+  async toggleLike(@Param('id') id: string, @Req() req) {
+    return this.postService.toggleLike(id, req.user.id);
   }
 }

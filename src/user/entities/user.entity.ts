@@ -54,6 +54,9 @@ export class User {
   @JoinTable()
   savedPosts: Post[];
 
+  @ManyToMany(() => Post, (post) => post.likedBy)
+  likedPosts: Post[];
+
   @OneToMany(() => Post, (post) => post.user)
   posts: Post[];
 }
