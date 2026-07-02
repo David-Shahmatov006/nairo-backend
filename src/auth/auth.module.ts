@@ -7,7 +7,6 @@ import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { UserModule } from 'src/user/user.module';
-import { InterestsModule } from 'src/interests/interests.module';
 
 @Module({
   imports: [
@@ -20,7 +19,6 @@ import { InterestsModule } from 'src/interests/interests.module';
       signOptions: { expiresIn: '1d' },
     }),
     UserModule,
-    InterestsModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

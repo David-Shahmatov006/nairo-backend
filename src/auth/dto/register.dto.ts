@@ -19,7 +19,4 @@ export class RegisterDto {
   @IsString()
   @IsNotEmpty()
   username: string;
-
-  @IsArray()
-  interests: string[];
 }

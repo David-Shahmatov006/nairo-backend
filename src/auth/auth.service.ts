@@ -4,7 +4,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from 'src/user/entities/user.entity';
-import { Interest } from 'src/interests/entities/interest.entity';
 import { LoginDto } from './dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
 
@@ -13,8 +12,6 @@ export class AuthService {
   constructor(
     @InjectRepository(User)
     private userRepo: Repository<User>,
-    @InjectRepository(Interest)
-    private interestRepo: Repository<Interest>,
     private jwtService: JwtService,
   ) {}
 
@@ -23,12 +20,12 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
-    const userExists = await this.userRepo.findOneBy({ email: dto.email });
+    const emailExists = await this.userRepo.findOneBy({ email: dto.email });
     const usernameExists = await this.userRepo.findOne({
       where: { username: dto.username },
     });
 
-    if (userExists) {
+    if (emailExists) {
       throw new BadRequestException('Email already registered');
     }
 
@@ -40,23 +37,12 @@ export class AuthService {
 
     const hashedPass = await bcrypt.hash(dto.password, 10);
 
-    const interests: Interest[] = [];
-    for (const name of dto.interests) {
-      let interest = await this.interestRepo.findOneBy({ name });
-      if (!interest) {
-        interest = this.interestRepo.create({ name });
-        await this.interestRepo.save(interest);
-      }
-      interests.push(interest);
-    }
-
     const newUser = this.userRepo.create({
       email: dto.email,
       password: hashedPass,
       username: dto.username,
       firstName: dto.firstName,
       lastName: dto.lastName,
-      interests,
     });
 
     const savedUser = await this.userRepo.save(newUser);
@@ -64,7 +50,7 @@ export class AuthService {
     const token = this.generateToken(savedUser);
 
     return {
-      message: 'User created',
+      message: 'User successfully created',
       user: savedUser,
       token,
     };
@@ -80,6 +66,7 @@ export class AuthService {
     }
 
     const isMatch = await bcrypt.compare(dto.password, user.password);
+
     if (!isMatch) {
       throw new BadRequestException('Invalid email or password');
     }

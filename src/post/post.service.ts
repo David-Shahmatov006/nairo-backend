@@ -65,7 +65,7 @@ export class PostService {
   async getRandomPosts(userId: string) {
     const posts = await this.postRepo
       .createQueryBuilder('post')
-      .leftJoinAndSelect('post.user', 'user')
+      .innerJoinAndSelect('post.user', 'user')
       .leftJoinAndSelect('post.likedBy', 'likedBy')
       .orderBy('RANDOM()')
       .limit(20)

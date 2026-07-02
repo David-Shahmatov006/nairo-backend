@@ -41,16 +41,22 @@ export class UserService {
     return this.userRepo.findOne({ where: { id: userId } });
   }
 
-  async getUserById(id: string) {
+  async getUserById(id: string, currentUserId?: string) {
     const user = await this.userRepo.findOne({
       where: { id },
+      relations: ['followers', 'following', 'posts'],
     });
 
-    if (!user) {
-      throw new NotFoundException('User not found');
+    if (!user) throw new NotFoundException('User not found');
+
+    let isFollowing = false;
+
+    if (currentUserId) {
+      isFollowing =
+        user.followers?.some((f) => f.id === currentUserId) ?? false;
     }
 
-    return user;
+    return { ...user, isFollowing };
   }
 
   async changeEmail(userId: string, newEmail: string) {
@@ -106,5 +112,81 @@ export class UserService {
     await this.userRepo.save(user);
 
     return user;
+  }
+
+  async toggleFollow(currentUserId: string, targetUserId: string) {
+    const currentUser = await this.userRepo.findOne({
+      where: { id: currentUserId },
+      relations: ['following'],
+    });
+
+    const targetUser = await this.userRepo.findOne({
+      where: { id: targetUserId },
+      relations: ['followers'],
+    });
+
+    if (!currentUser || !targetUser)
+      throw new NotFoundException('User not found');
+
+    // FIX: если пустые массивы — создаём их
+    currentUser.following = currentUser.following ?? [];
+    targetUser.followers = targetUser.followers ?? [];
+
+    const isFollowing = currentUser.following.some(
+      (u) => u.id === targetUserId,
+    );
+
+    if (isFollowing) {
+      // ⛔ UNFOLLOW
+      currentUser.following = currentUser.following.filter(
+        (u) => u.id !== targetUserId,
+      );
+
+      targetUser.followers = targetUser.followers.filter(
+        (u) => u.id !== currentUserId,
+      );
+    } else {
+      // ✅ FOLLOW
+      currentUser.following.push(targetUser);
+      targetUser.followers.push(currentUser);
+    }
+
+    await this.userRepo.save(currentUser);
+    await this.userRepo.save(targetUser);
+
+    return { isFollowing: !isFollowing };
+  }
+
+  async searchUsers(query: string) {
+    if (!query.trim()) return [];
+
+    return this.userRepo
+      .createQueryBuilder('user')
+      .select([
+        'user.id',
+        'user.username',
+        'user.firstName',
+        'user.lastName',
+        'user.avatar',
+      ])
+      .where('user.username ILIKE :q', { q: `%${query}%` })
+      .orWhere('user.firstName ILIKE :q', { q: `%${query}%` })
+      .orWhere('user.lastName ILIKE :q', { q: `%${query}%` })
+      .limit(20)
+      .getMany();
+  }
+
+  async checkUserFields(dto: { email: string; username: string }) {
+    const emailExists = await this.userRepo.findOne({
+      where: { email: dto.email },
+    });
+    const usernameExists = await this.userRepo.findOne({
+      where: { username: dto.username },
+    });
+
+    return {
+      emailExists: !!emailExists,
+      usernameExists: !!usernameExists,
+    };
   }
 }

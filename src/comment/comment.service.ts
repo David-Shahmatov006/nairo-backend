@@ -25,6 +25,7 @@ export class CommentService {
     const post = await this.postRepo.findOne({
       where: { id: dto.postId },
     });
+    
     if (!post) throw new NotFoundException('Post not found');
 
     const user = await this.userRepo.findOne({ where: { id: userId } });
@@ -43,7 +44,7 @@ export class CommentService {
   async getPostComments(postId: string) {
     return this.commentRepo.find({
       where: { post: { id: postId } },
-      relations: ['user'],
+      relations: ['user', 'post', 'post.user'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -55,8 +56,6 @@ export class CommentService {
     });
 
     if (!comment) throw new NotFoundException('Comment not found');
-    if (comment.user.id !== userId)
-      throw new ForbiddenException('Not your comment');
 
     await this.commentRepo.delete(commentId);
     return { deleted: true };

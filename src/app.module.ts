@@ -3,11 +3,12 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
-import { InterestsModule } from './interests/interests.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { PostModule } from './post/post.module';
 import { CommentModule } from './comment/comment.module';
+import { ChatModule } from './chat/chat.module';
+import { PasswordResetsModule } from './password_resets/password_resets.module';
 
 @Module({
   imports: [
@@ -23,14 +24,15 @@ import { CommentModule } from './comment/comment.module';
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
       autoLoadEntities: true,
-      synchronize: true,
+      synchronize: false,
     }),
 
     AuthModule,
     UserModule,
-    InterestsModule,
     PostModule,
     CommentModule,
+    ChatModule,
+    PasswordResetsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

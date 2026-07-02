@@ -1,4 +1,4 @@
-import { Interest } from 'src/interests/entities/interest.entity';
+import { PasswordReset } from 'src/password_resets/entities/password_resets.entity';
 import { Post } from 'src/post/entities/post.entity';
 import {
   Entity,
@@ -7,6 +7,7 @@ import {
   ManyToMany,
   JoinTable,
   OneToMany,
+  ManyToOne,
 } from 'typeorm';
 
 @Entity()
@@ -35,20 +36,15 @@ export class User {
   @Column({ nullable: true })
   bio: string;
 
-  @Column({ type: 'int', default: 0 })
-  nairoBalance: number;
-
-  @Column({ default: false })
-  isPremium: boolean;
-
   @Column({ default: 'en' })
   preferredLanguage: string;
 
-  @ManyToMany(() => Interest, (interest) => interest.users, {
-    cascade: true,
-  })
+  @ManyToMany(() => User, (user) => user.following)
   @JoinTable()
-  interests: Interest[];
+  followers: User[];
+
+  @ManyToMany(() => User, (user) => user.followers)
+  following: User[];
 
   @ManyToMany(() => Post, { eager: false })
   @JoinTable()
@@ -59,4 +55,7 @@ export class User {
 
   @OneToMany(() => Post, (post) => post.user)
   posts: Post[];
+
+  @OneToMany(() => PasswordReset, (pr) => pr.user)
+  passwordResets: PasswordReset[];
 }

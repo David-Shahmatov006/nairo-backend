@@ -50,9 +50,9 @@ export class UserController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get(':id')
-  async getUserById(@Param('id') id: string) {
-    return this.userService.getUserById(id);
+  @Get('/:id')
+  async getUser(@Param('id') id: string, @Req() req) {
+    return this.userService.getUserById(id, req.user.id);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -78,5 +78,21 @@ export class UserController {
   @Patch('change-language')
   changeLanguage(@Req() req, @Body() body: { language: string }) {
     return this.userService.changeLanguage(req.user.id, body.language);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('/:id/follow')
+  toggleFollow(@Req() req, @Param('id') targetUserId: string) {
+    return this.userService.toggleFollow(req.user.id, targetUserId);
+  }
+
+  @Get('search/:query')
+  async searchUsers(@Param('query') query: string) {
+    return this.userService.searchUsers(query);
+  }
+
+  @Post('/check')
+  async checkuserFields(@Body() dto: { email: string; username: string }) {
+    return this.userService.checkUserFields(dto);
   }
 }
