@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  CreateDateColumn,
+} from 'typeorm';
 import { User } from '../../user/entities/user.entity';
 import { Chat } from './chat.entity';
 
@@ -10,7 +16,7 @@ export class Message {
   @Column('text')
   text: string;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   sender: User;
 
   @ManyToOne(() => Chat, (chat) => chat.messages)
