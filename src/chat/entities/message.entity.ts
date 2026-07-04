@@ -4,6 +4,7 @@ import {
   Column,
   ManyToOne,
   CreateDateColumn,
+  JoinColumn,
 } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
 import { Chat } from './chat.entity';
@@ -17,6 +18,7 @@ export class Message {
   text: string;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'senderId' })
   sender: User;
 
   @ManyToOne(() => Chat, (chat) => chat.messages)
