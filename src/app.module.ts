@@ -24,7 +24,7 @@ import { PasswordResetsModule } from './password_resets/password_resets.module';
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
       autoLoadEntities: true,
-      synchronize: true,
+      synchronize: false,
     }),
 
     AuthModule,

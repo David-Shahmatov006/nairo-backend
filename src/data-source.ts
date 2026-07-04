@@ -25,5 +25,5 @@ export default new DataSource({
   entities: ['dist/**/*.entity.js'],
   migrations: ['dist/migrations/*.js'],
 
-  synchronize: true,
+  synchronize: false,
 });
