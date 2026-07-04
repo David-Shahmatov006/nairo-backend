@@ -5,13 +5,14 @@ import { UserModule } from 'src/user/user.module';
 import { PostController } from './post.controller';
 import { PostService } from './post.service';
 import { User } from 'src/user/entities/user.entity';
+import { R2Service } from 'src/r2.service';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Post, User])
   ],
   controllers: [PostController],
-  providers: [PostService],
+  providers: [PostService, R2Service],
 })
 
 export class PostModule {}

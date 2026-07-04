@@ -15,35 +15,30 @@ import { diskStorage } from 'multer';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { extname } from 'path';
 import { PostService } from './post.service';
+import { R2Service } from 'src/r2.service';
 
 @Controller('posts')
 export class PostController {
-  constructor(private postService: PostService) {}
+  constructor(
+    private postService: PostService,
+    private r2Service: R2Service,
+  ) {}
 
   @UseGuards(JwtAuthGuard)
   @Post('create')
-  @UseInterceptors(
-    FileInterceptor('image', {
-      storage: diskStorage({
-        destination: './uploads/posts',
-        filename: (_, file, cb) => {
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, uniqueSuffix + extname(file.originalname));
-        },
-      }),
-    }),
-  )
-  createPost(
+  @UseInterceptors(FileInterceptor('image'))
+  async createPost(
     @UploadedFile() file: Express.Multer.File,
     @Body() body: { title: string; description: string },
     @Req() req,
   ) {
+    const imageUrl = await this.r2Service.uploadFile(file, 'posts');
+
     return this.postService.createPost(
       req.user.id,
       body.title,
       body.description,
-      file.filename,
+      imageUrl,
     );
   }
 
@@ -51,7 +46,14 @@ export class PostController {
   @Delete(':id')
   async deletePost(@Req() req, @Param('id') postId: string) {
     const userId = req.user.id;
-    return this.postService.deletePost(postId, userId);
+    const post = await this.postService.getPostInfo(postId, userId);
+    const result = await this.postService.deletePost(postId, userId);
+
+    if (post && post.image) {
+      await this.r2Service.deleteFile(post.image);
+    }
+
+    return result;
   }
 
   @UseGuards(JwtAuthGuard)

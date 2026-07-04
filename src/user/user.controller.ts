@@ -16,10 +16,14 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { R2Service } from 'src/r2.service';
 
 @Controller('user')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly r2Service: R2Service,
+  ) {}
 
   @UseGuards(JwtAuthGuard)
   @Post('update')
@@ -30,23 +34,19 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard)
   @Post('avatar')
-  @UseInterceptors(
-    FileInterceptor('avatar', {
-      storage: diskStorage({
-        destination: './uploads/avatars',
-        filename: (req, file, cb) => {
-          const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-          cb(null, unique + extname(file.originalname));
-        },
-      }),
-    }),
-  )
+  @UseInterceptors(FileInterceptor('avatar'))
   async uploadAvatar(@UploadedFile() file: Express.Multer.File, @Req() req) {
     const userId = req.user.id;
+    const currentUser = await this.userService.getUserById(userId, userId);
 
-    const avatarUrl = '/uploads/avatars/' + file.filename;
+    const avatarUrl = await this.r2Service.uploadFile(file, 'avatars');
+    const updatedUser = await this.userService.updateAvatar(userId, avatarUrl);
 
-    return await this.userService.updateAvatar(userId, avatarUrl);
+    if (currentUser && currentUser.avatar) {
+      await this.r2Service.deleteFile(currentUser.avatar);
+    }
+
+    return updatedUser;
   }
 
   @UseGuards(JwtAuthGuard)

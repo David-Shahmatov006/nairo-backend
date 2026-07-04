@@ -30,7 +30,7 @@ export class PostService {
     const post = this.postRepo.create({
       title,
       description,
-      image: `/uploads/posts/${image || ''}`,
+      image: image,
       user,
     });
 
