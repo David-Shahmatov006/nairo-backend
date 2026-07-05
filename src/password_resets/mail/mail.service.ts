@@ -1,29 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 @Injectable()
 export class MailService {
-  private transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    requireTLS: true,
-    auth: {
-      user: process.env.MAIL_USER,
-      pass: process.env.MAIL_PASSWORD,
-    },
-  });
+  private resend = new Resend(process.env.RESEND_API_KEY);
 
   async sendResetCode(email: string, code: string) {
-    console.log('Before sendMail');
-
-    await this.transporter.sendMail({
-      from: `"Nairo" <${process.env.MAIL_USER}>`,
+    await this.resend.emails.send({
+      from: 'Nairo <onboarding@resend.dev>',
       to: email,
       subject: 'Reset your Nairo password',
-
       html: `
-<!DOCTYPE html>
+        <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -183,9 +171,7 @@ All rights reserved.
 
 </body>
 </html>
-`,
+      `,
     });
-    
-    console.log('After sendMail');
   }
 }
