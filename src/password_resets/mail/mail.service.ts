@@ -15,6 +15,8 @@ export class MailService {
   });
 
   async sendResetCode(email: string, code: string) {
+    console.log('Before sendMail');
+
     await this.transporter.sendMail({
       from: `"Nairo" <${process.env.MAIL_USER}>`,
       to: email,
@@ -183,5 +185,7 @@ All rights reserved.
 </html>
 `,
     });
+    
+    console.log('After sendMail');
   }
 }
