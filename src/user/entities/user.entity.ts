@@ -39,11 +39,13 @@ export class User {
   @Column({ default: 'en' })
   preferredLanguage: string;
 
-  @ManyToMany(() => User, (user) => user.following)
-  @JoinTable()
+  @ManyToMany(() => User, (user) => user.following, { onDelete: 'CASCADE' })
+  @JoinTable({
+    name: 'user_followers_user',
+  })
   followers: User[];
 
-  @ManyToMany(() => User, (user) => user.followers)
+  @ManyToMany(() => User, (user) => user.followers, { onDelete: 'CASCADE' })
   following: User[];
 
   @ManyToMany(() => Post, { eager: false })
