@@ -26,6 +26,8 @@ export class PasswordReset {
   @Column({ type: 'timestamp', nullable: true })
   usedAt: Date | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({
+    type: 'timestamptz',
+  })
   createdAt: Date;
 }
