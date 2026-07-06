@@ -57,10 +57,12 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.userRepo.findOne({
-      where: { email: dto.email },
-    });
-
+    const user = await this.userRepo
+      .createQueryBuilder('user')
+      .addSelect('user.password')
+      .where('user.email = :email', { email: dto.email })
+      .getOne();
+    
     if (!user) {
       throw new BadRequestException('Invalid email or password');
     }
@@ -73,9 +75,11 @@ export class AuthService {
 
     const token = this.generateToken(user);
 
+    const { password, ...userWithoutPassword } = user;
+
     return {
       message: 'Login successful',
-      user,
+      user: userWithoutPassword,
       token,
     };
   }
