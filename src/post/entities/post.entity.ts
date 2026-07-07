@@ -28,6 +28,10 @@ export class Post {
   @ManyToMany(() => User, (user) => user.likedPosts, { eager: false })
   @JoinTable()
   likedBy: User[];
+  
+  @ManyToMany(() => User, (user) => user.savedPosts, { eager: false })
+  @JoinTable()
+  savedBy: User[];
 
   @Column({ default: 0 })
   savings: number;

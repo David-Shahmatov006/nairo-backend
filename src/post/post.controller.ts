@@ -9,6 +9,7 @@ import {
   Get,
   Param,
   Delete,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -58,21 +59,34 @@ export class PostController {
 
   @UseGuards(JwtAuthGuard)
   @Get('/saved')
-  async getSavedPosts(@Req() req) {
-    return this.postService.getSavedPosts(req.user.id);
+  async getSavedPosts(
+    @Req() req,
+    @Query('page') page: string,
+    @Query('limit') limit: string,
+  ) {
+    return this.postService.getSavedPosts(req.user.id, +page, +limit);
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get('/random')
-  async getRandomPosts(@Req() req) {
-    return this.postService.getRandomPosts(req.user.id);
+  @Get('/all')
+  async getAllPosts(
+    @Req() req,
+    @Query('page') page: string,
+    @Query('limit') limit: string,
+  ) {
+    return this.postService.getAllPosts(req.user.id, +page, +limit);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('/user/:id')
-  async getUserPosts(@Param('id') userId: string, @Req() req) {
+  async getUserPosts(
+    @Param('id') userId: string,
+    @Req() req,
+    @Query('page') page: string,
+    @Query('limit') limit: string,
+  ) {
     const currentUserId = req.user.id;
-    return this.postService.getUserPosts(userId, currentUserId);
+    return this.postService.getUserPosts(userId, currentUserId, +page, +limit);
   }
 
   @UseGuards(JwtAuthGuard)

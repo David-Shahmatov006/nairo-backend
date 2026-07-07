@@ -37,11 +37,18 @@ export class PostService {
     return this.postRepo.save(post);
   }
 
-  async getUserPosts(userId: string, currentUserId: string) {
+  async getUserPosts(
+    userId: string,
+    currentUserId: string,
+    page: number,
+    limit: number,
+  ) {
     const posts = await this.postRepo.find({
       where: { user: { id: userId } },
       relations: ['user', 'likedBy'],
       order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
 
     const viewer = await this.userRepo.findOne({
@@ -54,21 +61,26 @@ export class PostService {
     const savedIds = new Set(viewer.savedPosts.map((p) => p.id));
     const likedIds = new Set(viewer.likedPosts.map((p) => p.id));
 
-    return posts.map((post) => ({
+    const data = posts.map((post) => ({
       ...post,
       isSaved: savedIds.has(post.id),
       isLiked: likedIds.has(post.id),
       likes: post.likedBy.length,
     }));
+    return {
+      posts: data,
+      hasMore: data.length === limit,
+    };
   }
 
-  async getRandomPosts(userId: string) {
+  async getAllPosts(userId: string, page: number, limit: number) {
     const posts = await this.postRepo
       .createQueryBuilder('post')
       .innerJoinAndSelect('post.user', 'user')
       .leftJoinAndSelect('post.likedBy', 'likedBy')
-      .orderBy('RANDOM()')
-      .limit(20)
+      .orderBy('post.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit)
       .getMany();
 
     const user = await this.userRepo.findOne({
@@ -81,34 +93,52 @@ export class PostService {
     const savedIds = new Set(user.savedPosts.map((p) => p.id));
     const likedIds = new Set(user.likedPosts.map((p) => p.id));
 
-    return posts.map((post) => ({
+    const data = posts.map((post) => ({
       ...post,
       isSaved: savedIds.has(post.id),
       isLiked: likedIds.has(post.id),
       likes: post.likedBy.length,
     }));
+
+    return {
+      posts: data,
+      hasMore: data.length === limit,
+    };
   }
 
-  async getSavedPosts(userId: string) {
+  async getSavedPosts(userId: string, page: number, limit: number) {
+    const posts = await this.postRepo
+      .createQueryBuilder('post')
+      .innerJoin('post.savedBy', 'savedBy', 'savedBy.id = :userId', { userId })
+      .leftJoinAndSelect('post.user', 'user')
+      .leftJoinAndSelect('post.likedBy', 'likedBy')
+      .orderBy('post.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getMany();
+
     const user = await this.userRepo.findOne({
       where: { id: userId },
-      relations: [
-        'savedPosts',
-        'savedPosts.user',
-        'likedPosts',
-        'savedPosts.likedBy',
-      ],
+      relations: ['likedPosts'],
     });
 
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
     const likedIds = new Set(user.likedPosts.map((p) => p.id));
 
-    return user.savedPosts.map((post) => ({
+    const data = posts.map((post) => ({
       ...post,
-      isLiked: likedIds.has(post.id),
       isSaved: true,
+      isLiked: likedIds.has(post.id),
       likes: post.likedBy.length,
     }));
+
+    return {
+      posts: data,
+      hasMore: data.length === limit,
+    };
   }
 
   async getPostInfo(postId: string, userId: string) {
