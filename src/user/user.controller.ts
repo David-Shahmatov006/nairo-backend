@@ -12,12 +12,11 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UserService } from './user.service';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { R2Service } from 'src/r2.service';
 
+@UseGuards(JwtAuthGuard)
 @Controller('user')
 export class UserController {
   constructor(
@@ -25,14 +24,12 @@ export class UserController {
     private readonly r2Service: R2Service,
   ) {}
 
-  @UseGuards(JwtAuthGuard)
-  @Post('update')
+  @Patch('update')
   async updateProfile(@Req() req, @Body() dto: UpdateUserDto) {
     const userId = req.user.id;
     return await this.userService.updateProfile(userId, dto);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Post('avatar')
   @UseInterceptors(FileInterceptor('avatar'))
   async uploadAvatar(@UploadedFile() file: Express.Multer.File, @Req() req) {
@@ -49,19 +46,16 @@ export class UserController {
     return updatedUser;
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('/:id')
   async getUser(@Param('id') id: string, @Req() req) {
     return this.userService.getUserById(id, req.user.id);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Patch('change-email')
   changeEmail(@Req() req, @Body() body: { newEmail: string }) {
     return this.userService.changeEmail(req.user.id, body.newEmail);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Patch('change-password')
   changePassword(
     @Req() req,
@@ -74,13 +68,11 @@ export class UserController {
     );
   }
 
-  @UseGuards(JwtAuthGuard)
   @Patch('change-language')
   changeLanguage(@Req() req, @Body() body: { language: string }) {
     return this.userService.changeLanguage(req.user.id, body.language);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Post('/:id/follow')
   toggleFollow(@Req() req, @Param('id') targetUserId: string) {
     return this.userService.toggleFollow(req.user.id, targetUserId);

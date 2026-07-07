@@ -54,7 +54,7 @@ export class R2Service {
         `Error during uploading on R2: ${err.message}`,
         err.stack,
       );
-      throw new InternalServerErrorException("We can't save your avatar =(");
+      throw new InternalServerErrorException("We can't save your image =(");
     }
   }
 

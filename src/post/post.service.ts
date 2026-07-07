@@ -7,6 +7,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Post } from './entities/post.entity';
 import { Repository } from 'typeorm';
 import { User } from 'src/user/entities/user.entity';
+import { UpdatePostDto } from './dto/update-post.dto';
+import { R2Service } from 'src/r2.service';
 
 @Injectable()
 export class PostService {
@@ -15,6 +17,7 @@ export class PostService {
     private postRepo: Repository<Post>,
     @InjectRepository(User)
     private userRepo: Repository<User>,
+    private r2Service: R2Service,
   ) {}
 
   async createPost(
@@ -33,6 +36,30 @@ export class PostService {
       image: image,
       user,
     });
+
+    return this.postRepo.save(post);
+  }
+
+  async updatePost(
+    postId: string,
+    dto: UpdatePostDto,
+    file?: Express.Multer.File,
+  ) {
+    const post = await this.postRepo.findOne({
+      where: { id: postId },
+    });
+
+    if (!post) {
+      throw new NotFoundException("Post was'nt found");
+    }
+
+    post.title = dto.title as string;
+    post.description = dto.description as string;
+
+    if (file) {
+      const imageUrl = await this.r2Service.uploadFile(file, 'posts');
+      post.image = imageUrl;
+    }
 
     return this.postRepo.save(post);
   }

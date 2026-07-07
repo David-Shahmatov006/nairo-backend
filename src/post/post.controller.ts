@@ -10,14 +10,15 @@ import {
   Param,
   Delete,
   Query,
+  Patch,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
+import {} from 'multer';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import { extname } from 'path';
 import { PostService } from './post.service';
 import { R2Service } from 'src/r2.service';
-
+import { UpdatePostDto } from './dto/update-post.dto';
+@UseGuards(JwtAuthGuard)
 @Controller('posts')
 export class PostController {
   constructor(
@@ -25,7 +26,6 @@ export class PostController {
     private r2Service: R2Service,
   ) {}
 
-  @UseGuards(JwtAuthGuard)
   @Post('create')
   @UseInterceptors(FileInterceptor('image'))
   async createPost(
@@ -43,7 +43,6 @@ export class PostController {
     );
   }
 
-  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   async deletePost(@Req() req, @Param('id') postId: string) {
     const userId = req.user.id;
@@ -57,7 +56,6 @@ export class PostController {
     return result;
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('/saved')
   async getSavedPosts(
     @Req() req,
@@ -67,7 +65,6 @@ export class PostController {
     return this.postService.getSavedPosts(req.user.id, +page, +limit);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('/all')
   async getAllPosts(
     @Req() req,
@@ -77,7 +74,6 @@ export class PostController {
     return this.postService.getAllPosts(req.user.id, +page, +limit);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('/user/:id')
   async getUserPosts(
     @Param('id') userId: string,
@@ -89,19 +85,26 @@ export class PostController {
     return this.postService.getUserPosts(userId, currentUserId, +page, +limit);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('/:id')
   async getPostInfo(@Req() req, @Param('id') postId: string) {
     return this.postService.getPostInfo(postId, req.user.id);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @Patch(':id')
+  @UseInterceptors(FileInterceptor('image'))
+  async updatePost(
+    @Param('id') postId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: UpdatePostDto,
+  ) {
+    return this.postService.updatePost(postId, dto, file);
+  }
+
   @Post('/:id/toggle-save')
   async toggleSave(@Param('id') postId: string, @Req() req) {
     return this.postService.toggleSavePost(req.user.id, postId);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Post(':id/like')
   async toggleLike(@Param('id') id: string, @Req() req) {
     return this.postService.toggleLike(id, req.user.id);
