@@ -50,7 +50,7 @@ export class User {
   @ManyToMany(() => User, (user) => user.followers, { onDelete: 'CASCADE' })
   following: User[];
 
-  @ManyToMany(() => Post, { eager: false })
+  @ManyToMany(() => Post, (user) => user.savedBy, { eager: false })
   @JoinTable()
   savedPosts: Post[];
 

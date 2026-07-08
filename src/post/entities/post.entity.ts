@@ -30,7 +30,6 @@ export class Post {
   likedBy: User[];
   
   @ManyToMany(() => User, (user) => user.savedPosts, { eager: false })
-  @JoinTable()
   savedBy: User[];
 
   @Column({ default: 0 })
