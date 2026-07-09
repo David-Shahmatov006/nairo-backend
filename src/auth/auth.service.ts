@@ -43,6 +43,7 @@ export class AuthService {
       username: dto.username,
       firstName: dto.firstName,
       lastName: dto.lastName,
+      preferredLanguage: dto.language
     });
 
     const savedUser = await this.userRepo.save(newUser);
