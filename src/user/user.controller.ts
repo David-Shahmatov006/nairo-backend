@@ -92,7 +92,6 @@ export class UserController {
 
   @Post('/check')
   async checkUserFields(@Body() dto: { email: string; username: string }) {
-    console.log(dto, 'dto');
     return this.userService.checkUserFields(dto);
   }
 }

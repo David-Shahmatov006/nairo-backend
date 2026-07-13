@@ -55,6 +55,7 @@ export class User {
   savedPosts: Post[];
 
   @ManyToMany(() => Post, (post) => post.likedBy)
+  @JoinTable()
   likedPosts: Post[];
 
   @OneToMany(() => Post, (post) => post.user)
@@ -62,4 +63,10 @@ export class User {
 
   @OneToMany(() => PasswordReset, (pr) => pr.user)
   passwordResets: PasswordReset[];
+
+  @Column({
+    nullable: true,
+    select: false,
+  })
+  refreshToken: string;
 }

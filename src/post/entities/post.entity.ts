@@ -26,7 +26,6 @@ export class Post {
   description: string;
 
   @ManyToMany(() => User, (user) => user.likedPosts, { eager: false })
-  @JoinTable()
   likedBy: User[];
   
   @ManyToMany(() => User, (user) => user.savedPosts, { eager: false })

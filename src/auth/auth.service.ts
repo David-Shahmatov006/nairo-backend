@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { RegisterDto } from './dto/register.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -15,19 +15,45 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  private generateToken(user: User) {
-    return this.jwtService.sign({ id: user.id, email: user.email });
+  private generateAccessToken(user: User) {
+    return this.jwtService.sign(
+      {
+        id: user.id,
+        email: user.email,
+      },
+      {
+        secret: process.env.JWT_ACCESS_SECRET,
+        expiresIn: '1d',
+      },
+    );
+  }
+
+  private generateRefreshToken(user: User) {
+    return this.jwtService.sign(
+      {
+        id: user.id,
+      },
+      {
+        secret: process.env.JWT_REFRESH_SECRET,
+        expiresIn: '7d',
+      },
+    );
   }
 
   async register(dto: RegisterDto) {
-    const emailExists = await this.userRepo.findOneBy({ email: dto.email });
-    const usernameExists = await this.userRepo.findOne({
-      where: { username: dto.username },
+    const emailExists = await this.userRepo.findOneBy({
+      email: dto.email,
     });
 
     if (emailExists) {
       throw new BadRequestException('Email already registered');
     }
+
+    const usernameExists = await this.userRepo.findOne({
+      where: {
+        username: dto.username,
+      },
+    });
 
     if (usernameExists) {
       throw new BadRequestException(
@@ -35,25 +61,29 @@ export class AuthService {
       );
     }
 
-    const hashedPass = await bcrypt.hash(dto.password, 10);
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
 
-    const newUser = this.userRepo.create({
+    const user = this.userRepo.create({
       email: dto.email,
-      password: hashedPass,
+      password: hashedPassword,
       username: dto.username,
       firstName: dto.firstName,
       lastName: dto.lastName,
-      preferredLanguage: dto.language
+      preferredLanguage: dto.language,
     });
 
-    const savedUser = await this.userRepo.save(newUser);
+    const savedUser = await this.userRepo.save(user);
 
-    const token = this.generateToken(savedUser);
+    const accessToken = this.generateAccessToken(savedUser);
+    const refreshToken = this.generateRefreshToken(savedUser);
+
+    const { password, ...userWithoutPassword } = savedUser;
 
     return {
       message: 'User successfully created',
-      user: savedUser,
-      token,
+      user: userWithoutPassword,
+      accessToken,
+      refreshToken,
     };
   }
 
@@ -61,9 +91,11 @@ export class AuthService {
     const user = await this.userRepo
       .createQueryBuilder('user')
       .addSelect('user.password')
-      .where('user.email = :email', { email: dto.email })
+      .where('user.email = :email', {
+        email: dto.email,
+      })
       .getOne();
-    
+
     if (!user) {
       throw new BadRequestException('Invalid email or password');
     }
@@ -74,14 +106,44 @@ export class AuthService {
       throw new BadRequestException('Invalid email or password');
     }
 
-    const token = this.generateToken(user);
+    const accessToken = this.generateAccessToken(user);
+    const refreshToken = this.generateRefreshToken(user);
 
     const { password, ...userWithoutPassword } = user;
 
     return {
       message: 'Login successful',
       user: userWithoutPassword,
-      token,
+      accessToken,
+      refreshToken,
     };
+  }
+
+  async refresh(refreshToken: string) {
+    try {
+      const payload = this.jwtService.verify(refreshToken, {
+        secret: process.env.JWT_REFRESH_SECRET,
+      });
+
+      const user = await this.userRepo.findOne({
+        where: {
+          id: payload.id,
+        },
+      });
+
+      if (!user) {
+        throw new UnauthorizedException();
+      }
+
+      const accessToken = this.generateAccessToken(user);
+      const newRefreshToken = this.generateRefreshToken(user);
+
+      return {
+        accessToken,
+        refreshToken: newRefreshToken,
+      };
+    } catch {
+      throw new UnauthorizedException();
+    }
   }
 }
