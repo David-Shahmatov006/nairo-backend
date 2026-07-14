@@ -9,6 +9,7 @@ import { PostModule } from './post/post.module';
 import { CommentModule } from './comment/comment.module';
 import { ChatModule } from './chat/chat.module';
 import { PasswordResetsModule } from './password_resets/password_resets.module';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
   imports: [
@@ -25,6 +26,15 @@ import { PasswordResetsModule } from './password_resets/password_resets.module';
       database: process.env.DB_NAME,
       autoLoadEntities: true,
       synchronize: false,
+    }),
+
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          ttl: 60000,
+          limit: 5,
+        },
+      ],
     }),
 
     AuthModule,

@@ -5,12 +5,14 @@ import {
   Req,
   Res,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import type { Response, Request } from 'express';
 
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ThrottlerGuard } from '@nestjs/throttler';
 
 @Controller('auth')
 export class AuthController {
@@ -36,7 +38,8 @@ export class AuthController {
       accessToken: result.accessToken,
     };
   }
-
+  
+  @UseGuards(ThrottlerGuard)
   @Post('login')
   async login(
     @Body() dto: LoginDto,

@@ -63,10 +63,4 @@ export class User {
 
   @OneToMany(() => PasswordReset, (pr) => pr.user)
   passwordResets: PasswordReset[];
-
-  @Column({
-    nullable: true,
-    select: false,
-  })
-  refreshToken: string;
 }

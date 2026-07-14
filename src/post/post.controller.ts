@@ -11,6 +11,7 @@ import {
   Delete,
   Query,
   Patch,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {} from 'multer';
@@ -86,7 +87,7 @@ export class PostController {
   }
 
   @Get('/:id')
-  async getPostInfo(@Req() req, @Param('id') postId: string) {
+  async getPostInfo(@Req() req, @Param('id', ParseUUIDPipe) postId: string) {
     return this.postService.getPostInfo(postId, req.user.id);
   }
 

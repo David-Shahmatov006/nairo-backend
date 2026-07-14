@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -10,7 +11,7 @@ import {
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
 import { extname } from 'path';
-
+import { fileTypeFromBuffer } from 'file-type';
 @Injectable()
 export class R2Service {
   private readonly s3Client: S3Client;
@@ -31,6 +32,12 @@ export class R2Service {
 
   async uploadFile(file: Express.Multer.File, folder: string): Promise<string> {
     try {
+      const type = await fileTypeFromBuffer(file.buffer);
+
+      if (!type || !type.mime.startsWith('image/')) {
+        throw new BadRequestException('Only image files are allowed');
+      }
+
       const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
       const extension = extname(file.originalname);
       const key = `${folder}/${uniqueSuffix}${extension}`;
