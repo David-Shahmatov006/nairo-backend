@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -30,6 +31,14 @@ export class PostService {
 
     if (!user) throw new NotFoundException("User wasn't found");
 
+    if (title?.length > 200) {
+      throw new BadRequestException('Max length of title is 200 symbols');
+    }
+
+    if (description?.length > 1000) {
+      throw new BadRequestException('Max length of description is 200 symbols');
+    }
+
     const post = this.postRepo.create({
       title,
       description,
@@ -51,6 +60,14 @@ export class PostService {
 
     if (!post) {
       throw new NotFoundException("Post was'nt found");
+    }
+
+    if (dto.title?.length! > 200) {
+      throw new BadRequestException('Max length of title is 200 symbols');
+    }
+
+    if (dto.description?.length! > 1000) {
+      throw new BadRequestException('Max length of description is 200 symbols');
     }
 
     post.title = dto.title as string;

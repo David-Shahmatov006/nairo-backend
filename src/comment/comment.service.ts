@@ -1,5 +1,5 @@
 import {
-  ForbiddenException,
+  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -25,12 +25,15 @@ export class CommentService {
     const post = await this.postRepo.findOne({
       where: { id: dto.postId },
     });
-    
+
     if (!post) throw new NotFoundException('Post not found');
 
     const user = await this.userRepo.findOne({ where: { id: userId } });
 
     if (!user) throw new NotFoundException('User not found');
+
+    if (dto.text.length > 500)
+      throw new BadRequestException('Max length of comment is 500 symbols');
 
     const comment = this.commentRepo.create({
       text: dto.text,
@@ -62,14 +65,19 @@ export class CommentService {
   }
 
   async updateComment(newText: string, commentId: string) {
-    const comment = await this.commentRepo.findOne({ where: { id: commentId } });
+    const comment = await this.commentRepo.findOne({
+      where: { id: commentId },
+    });
 
     if (!comment) throw new NotFoundException('Comment not found');
+    
+    if (newText.length > 500)
+      throw new BadRequestException('Max length of comment is 500 symbols');
 
     comment.text = newText;
 
-    await this.commentRepo.save(comment)
+    await this.commentRepo.save(comment);
 
-    return comment
+    return comment;
   }
 }
