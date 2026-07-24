@@ -6,7 +6,6 @@ import {
   UseGuards,
   Req,
   Delete,
-  Query,
 } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { Request } from 'express';

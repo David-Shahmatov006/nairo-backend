@@ -34,11 +34,13 @@ export class CommentController {
     return this.commentService.deleteComment(commentId, req.user.id);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Patch('/:id')
   async updateComment(
+    @Req() req,
     @Body('newText') newText: string,
     @Param('id') commentId: string,
   ) {
-    return this.commentService.updateComment(newText, commentId);
+    return this.commentService.updateComment(newText, commentId, req.user.id);
   }
 }

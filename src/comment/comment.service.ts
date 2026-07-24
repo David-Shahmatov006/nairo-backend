@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -60,17 +61,24 @@ export class CommentService {
 
     if (!comment) throw new NotFoundException('Comment not found');
 
+    if (comment?.user.id !== userId)
+      throw new ForbiddenException("You can't delete this comment");
+
     await this.commentRepo.delete(commentId);
     return { deleted: true };
   }
 
-  async updateComment(newText: string, commentId: string) {
+  async updateComment(newText: string, commentId: string, userId: string) {
     const comment = await this.commentRepo.findOne({
       where: { id: commentId },
+      relations: ['user'],
     });
 
     if (!comment) throw new NotFoundException('Comment not found');
-    
+
+    if (comment?.user.id !== userId)
+      throw new ForbiddenException("You can't edit this comment");
+
     if (newText.length > 500)
       throw new BadRequestException('Max length of comment is 500 symbols');
 

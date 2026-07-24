@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Chat } from './entities/chat.entity';
 import { Message } from './entities/message.entity';
@@ -90,6 +95,33 @@ export class ChatService {
       chatId: chat.id,
       message: savedFullMessage!,
     };
+  }
+
+  async updateMessage(messageId: string, newText: string, userId: string) {
+    const message = await this.messageRepo.findOne({
+      where: { id: messageId },
+      relations: ['sender', 'chat'],
+    });
+
+    if (!message) {
+      throw new NotFoundException('Message not found');
+    }
+
+    if (message.sender.id !== userId)
+      throw new ForbiddenException("You can't edit this message");
+
+    if (!newText.trim()) {
+      throw new BadRequestException('Message cannot be empty');
+    }
+
+    if (message.text === newText) {
+      return message;
+    }
+
+    message.text = newText;
+    message.editedAt = new Date();
+
+    return this.messageRepo.save(message);
   }
 
   async getMessages(chatId: string) {

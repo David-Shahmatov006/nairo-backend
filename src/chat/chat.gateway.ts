@@ -52,13 +52,34 @@ export class ChatGateway {
     this.server.emit('newActivity', { chatId: result.chatId });
   }
 
+  @SubscribeMessage('updateMessage')
+  async handleUpdateMessage(
+    @MessageBody()
+    payload: {
+      messageId: string;
+      newText: string;
+      userId: string;
+    },
+  ) {
+    const message = await this.chatService.updateMessage(
+      payload.messageId,
+      payload.newText,
+      payload.userId,
+    );
+
+    this.server.to(message.chat.id).emit('messageUpdated', {
+      messageId: message.id,
+      text: message.text,
+      editedAt: message.editedAt,
+    });
+  }
+
   @SubscribeMessage('joinChat')
   handleJoinChat(
     @MessageBody() payload: { chatId: string },
     @ConnectedSocket() client: Socket,
   ) {
     client.join(payload.chatId);
-    console.log(`Client ${client.id} joined room ${payload.chatId}`);
   }
 
   @SubscribeMessage('leaveChat')
@@ -67,11 +88,11 @@ export class ChatGateway {
     @ConnectedSocket() client: Socket,
   ) {
     client.leave(payload.chatId);
-    console.log(`Client ${client.id} left room ${payload.chatId}`);
   }
 
   @SubscribeMessage('typing')
   handleTyping(
+    @ConnectedSocket() client,
     @MessageBody()
     payload: {
       chatId: string;
@@ -79,7 +100,7 @@ export class ChatGateway {
       isTyping: boolean;
     },
   ) {
-    this.server.to(payload.chatId).emit('typingStatus', {
+    client.broadcast.to(payload.chatId).emit('typingStatus', {
       userId: payload.userId,
       isTyping: payload.isTyping,
     });
