@@ -74,6 +74,24 @@ export class ChatGateway {
     });
   }
 
+  @SubscribeMessage('deleteMessage')
+  async handleDeleteMessage(
+    @MessageBody()
+    payload: {
+      messageId: string;
+      userId: string;
+    },
+  ) {
+    const message = await this.chatService.deleteMessage(
+      payload.messageId,
+      payload.userId,
+    );
+    
+    this.server
+      .to(message.chat.id)
+      .emit('messageDeleted', { messageId: message.id });
+  }
+
   @SubscribeMessage('joinChat')
   handleJoinChat(
     @MessageBody() payload: { chatId: string },

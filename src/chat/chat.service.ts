@@ -124,6 +124,22 @@ export class ChatService {
     return this.messageRepo.save(message);
   }
 
+  async deleteMessage(messageId: string, userId: string) {
+    const message = await this.messageRepo.findOne({
+      where: { id: messageId },
+      relations: ['sender', 'chat'],
+    });
+
+    if (!message) throw new NotFoundException('Message not found');
+
+    if (message.sender.id !== userId)
+      throw new ForbiddenException("You can't delete this message");
+
+    await this.messageRepo.delete(messageId);
+
+    return message;
+  }
+
   async getMessages(chatId: string) {
     return this.messageRepo.find({
       where: { chat: { id: chatId } },
