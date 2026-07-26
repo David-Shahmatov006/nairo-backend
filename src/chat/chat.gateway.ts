@@ -19,6 +19,14 @@ export class ChatGateway {
 
   constructor(private readonly chatService: ChatService) {}
 
+  @SubscribeMessage('connectUser')
+  handleConnectUser(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { userId: string },
+  ) {
+    client.join(`user:${payload.userId}`);
+  }
+
   @SubscribeMessage('sendMessage')
   async handleMessage(
     @MessageBody()
@@ -44,11 +52,15 @@ export class ChatGateway {
       id: saved.id,
       chatId: result.chatId,
       text: saved.text,
-      senderId: saved.sender.id,
-      time: saved.createdAt.toISOString(),
+      sender: saved.sender,
+      createdAt: saved.createdAt.toISOString(),
     };
 
     this.server.to(result.chatId).emit('receiveMessage', messageToSend);
+
+    this.server
+      .to(`user:${payload.receiverId}`)
+      .emit('newMessageNotification', messageToSend);
     this.server.emit('newActivity', { chatId: result.chatId });
   }
 
