@@ -8,7 +8,7 @@ The server provides authentication, real-time messaging, user management, posts,
 
 ## 🌍 Live API
 
-🔗 API: Soon...
+🔗 Swagger: Soon...
 
 🔗 Frontend: https://nairo-frontend-production.up.railway.app/
 
