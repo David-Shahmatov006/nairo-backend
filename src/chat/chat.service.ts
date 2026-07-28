@@ -18,6 +18,25 @@ export class ChatService {
     @InjectRepository(User) private userRepo: Repository<User>,
   ) {}
 
+  async readMessages(chatId: string, userId: string) {
+    const chat = await this.chatRepo.findOne({
+      where: { id: chatId },
+    });
+
+    if (!chat) {
+      throw new NotFoundException('Chat not found');
+    }
+
+    chat.lastReadMessages = {
+      ...(chat.lastReadMessages ?? {}),
+      [userId]: new Date().toISOString(),
+    };
+
+    await this.chatRepo.save(chat);
+
+    return chat;
+  }
+
   async findChatBetween(user1: string, user2: string) {
     return this.chatRepo
       .createQueryBuilder('chat')
@@ -34,11 +53,33 @@ export class ChatService {
       .leftJoin('chat.participants', 'filterParticipant')
       .leftJoinAndSelect('chat.participants', 'participants')
       .leftJoinAndSelect('chat.messages', 'messages')
+      .leftJoinAndSelect('messages.sender', 'sender')
       .where('filterParticipant.id = :userId', { userId })
       .orderBy('messages.createdAt', 'DESC')
       .getMany();
 
-    return chats.filter((c) => c.messages.length > 0);
+    return chats
+      .filter((chat) => chat.messages.length > 0)
+      .map((chat) => {
+        const lastReadAt = chat.lastReadMessages?.[userId];
+
+        const unreadCount = chat.messages.filter((message) => {
+          if (message.sender.id === userId) {
+            return false;
+          }
+
+          if (!lastReadAt) {
+            return true;
+          }
+
+          return message.createdAt > new Date(lastReadAt);
+        }).length;
+
+        return {
+          ...chat,
+          unreadCount,
+        };
+      });
   }
 
   async sendMessage(

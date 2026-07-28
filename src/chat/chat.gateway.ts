@@ -18,6 +18,7 @@ export class ChatGateway {
   server: Server;
 
   constructor(private readonly chatService: ChatService) {}
+  private openedChats = new Map<string, string>();
 
   @SubscribeMessage('connectUser')
   handleConnectUser(
@@ -56,12 +57,47 @@ export class ChatGateway {
       createdAt: saved.createdAt.toISOString(),
     };
 
+    const receiverSockets = await this.server
+      .in(`user:${payload.receiverId}`)
+      .fetchSockets();
+
+    const receiverIsInChat = receiverSockets.some((socket) =>
+      socket.rooms.has(result.chatId),
+    );
+
+    if (receiverIsInChat) {
+      await this.chatService.readMessages(result.chatId, payload.receiverId);
+    }
+
     this.server.to(result.chatId).emit('receiveMessage', messageToSend);
 
     this.server
       .to(`user:${payload.receiverId}`)
-      .emit('newMessageNotification', messageToSend);
+      .emit('newMessageNotification', {
+        ...messageToSend,
+        unread: true,
+      });
     this.server.emit('newActivity', { chatId: result.chatId });
+  }
+
+  @SubscribeMessage('readMessages')
+  async handleReadMessages(
+    @MessageBody()
+    payload: {
+      chatId: string;
+      userId: string;
+    },
+  ) {
+    const chat = await this.chatService.readMessages(
+      payload.chatId,
+      payload.userId,
+    );
+
+    this.server.to(payload.chatId).emit('messagesRead', {
+      userId: payload.userId,
+      chatId: payload.chatId,
+      lastReadAt: chat.lastReadMessages[payload.userId],
+    });
   }
 
   @SubscribeMessage('updateMessage')
@@ -98,7 +134,7 @@ export class ChatGateway {
       payload.messageId,
       payload.userId,
     );
-    
+
     this.server
       .to(message.chat.id)
       .emit('messageDeleted', { messageId: message.id });
@@ -110,6 +146,8 @@ export class ChatGateway {
     @ConnectedSocket() client: Socket,
   ) {
     client.join(payload.chatId);
+
+    this.openedChats.set(client.id, payload.chatId);
   }
 
   @SubscribeMessage('leaveChat')
@@ -118,6 +156,8 @@ export class ChatGateway {
     @ConnectedSocket() client: Socket,
   ) {
     client.leave(payload.chatId);
+
+    this.openedChats.delete(client.id);
   }
 
   @SubscribeMessage('typing')
