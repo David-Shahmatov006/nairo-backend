@@ -49,37 +49,48 @@ export class ChatService {
   async getUserChats(userId: string) {
     const chats = await this.chatRepo
       .createQueryBuilder('chat')
-      .distinct(true)
-      .leftJoin('chat.participants', 'filterParticipant')
+      .innerJoin(
+        'chat.participants',
+        'filterParticipant',
+        'filterParticipant.id = :userId',
+        { userId },
+      )
+      .innerJoin('chat.messages', 'hasMessages')
       .leftJoinAndSelect('chat.participants', 'participants')
-      .leftJoinAndSelect('chat.messages', 'messages')
-      .leftJoinAndSelect('messages.sender', 'sender')
-      .where('filterParticipant.id = :userId', { userId })
-      .orderBy('messages.createdAt', 'DESC')
+      .distinct(true)
       .getMany();
 
-    return chats
-      .filter((chat) => chat.messages.length > 0)
-      .map((chat) => {
-        const lastReadAt = chat.lastReadMessages?.[userId];
+    if (!chats.length) {
+      return [];
+    }
 
-        const unreadCount = chat.messages.filter((message) => {
-          if (message.sender.id === userId) {
-            return false;
-          }
+    const chatIds = chats.map((chat) => chat.id);
 
-          if (!lastReadAt) {
-            return true;
-          }
+    const unreadRows: Array<{ chatId: string; count: string }> =
+      await this.messageRepo.query(
+        `
+          SELECT m."chatId" AS "chatId", COUNT(*)::int AS count
+          FROM message m
+          INNER JOIN chat c ON c.id = m."chatId"
+          WHERE m."chatId" = ANY($1)
+            AND m."senderId" != $2
+            AND (
+              c."lastReadMessages"->>($2::text) IS NULL
+              OR m."createdAt" > ((c."lastReadMessages"->>($2::text))::timestamptz)
+            )
+          GROUP BY m."chatId"
+        `,
+        [chatIds, userId],
+      );
 
-          return message.createdAt > new Date(lastReadAt);
-        }).length;
+    const unreadMap = new Map(
+      unreadRows.map((row) => [row.chatId, Number(row.count)]),
+    );
 
-        return {
-          ...chat,
-          unreadCount,
-        };
-      });
+    return chats.map((chat) => ({
+      ...chat,
+      unreadCount: unreadMap.get(chat.id) ?? 0,
+    }));
   }
 
   async sendMessage(
@@ -104,6 +115,7 @@ export class ChatService {
     if (!chat) {
       const users = await this.userRepo.find({
         where: { id: In([senderId, receiverId]) },
+        select: ['id', 'username', 'firstName', 'lastName', 'avatar', 'email'],
       });
       if (users.length < 2) {
         throw new NotFoundException('Users not found');
@@ -113,7 +125,10 @@ export class ChatService {
       chat = await this.chatRepo.save(chat);
     }
 
-    const sender = await this.userRepo.findOne({ where: { id: senderId } });
+    const sender = await this.userRepo.findOne({
+      where: { id: senderId },
+      select: ['id', 'username', 'firstName', 'lastName', 'avatar', 'email'],
+    });
 
     if (!sender) {
       throw new NotFoundException('Sender not found');
@@ -127,14 +142,9 @@ export class ChatService {
 
     const savedMessage = await this.messageRepo.save(message);
 
-    const savedFullMessage = await this.messageRepo.findOne({
-      where: { id: savedMessage.id },
-      relations: ['sender'],
-    });
-
     return {
       chatId: chat.id,
-      message: savedFullMessage!,
+      message: savedMessage,
     };
   }
 
@@ -197,11 +207,12 @@ export class ChatService {
 
     if (!chat) throw new NotFoundException('Chat not found');
 
+    chat.participants = chat.participants.filter((p) => p.id !== userId);
+
     if (chat.participants.length === 0) {
       await this.chatRepo.delete(chatId);
+      return { success: true };
     }
-
-    chat.participants = chat.participants.filter((p) => p.id !== userId);
 
     await this.chatRepo.save(chat);
 
@@ -217,12 +228,9 @@ export class ChatService {
 
     return this.chatRepo
       .createQueryBuilder('chat')
-      .leftJoin('chat.participants', 'me', 'me.id = :userId', { userId })
+      .innerJoin('chat.participants', 'me', 'me.id = :userId', { userId })
       .leftJoinAndSelect('chat.participants', 'p')
-      .leftJoinAndSelect('chat.messages', 'messages')
-      .where('me.id IS NOT NULL')
       .andWhere('p.id != :userId', { userId })
-
       .andWhere(
         `
       LOWER(p.firstName) LIKE LOWER(:q) OR
@@ -231,7 +239,8 @@ export class ChatService {
     `,
         { q },
       )
-      .orderBy('messages.createdAt', 'DESC')
+      .distinct(true)
+      .take(20)
       .getMany();
   }
 }

@@ -48,8 +48,9 @@ export class CommentService {
   async getPostComments(postId: string) {
     return this.commentRepo.find({
       where: { post: { id: postId } },
-      relations: ['user', 'post', 'post.user'],
+      relations: ['user'],
       order: { createdAt: 'DESC' },
+      take: 100,
     });
   }
 

@@ -77,7 +77,11 @@ export class ChatGateway {
         ...messageToSend,
         unread: true,
       });
-    this.server.emit('newActivity', { chatId: result.chatId });
+
+    this.server
+      .to(`user:${payload.senderId}`)
+      .to(`user:${payload.receiverId}`)
+      .emit('newActivity', { chatId: result.chatId });
   }
 
   @SubscribeMessage('readMessages')

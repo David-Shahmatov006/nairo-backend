@@ -41,6 +41,13 @@ export class UserService {
     return this.userRepo.findOne({ where: { id: userId } });
   }
 
+  async getUserAvatar(userId: string) {
+    return this.userRepo.findOne({
+      where: { id: userId },
+      select: ['id', 'avatar'],
+    });
+  }
+
   async getUserById(id: string, currentUserId?: string) {
     const user = await this.userRepo.findOne({
       where: { id },
@@ -86,7 +93,11 @@ export class UserService {
     oldPassword: string,
     newPassword: string,
   ) {
-    const user = await this.userRepo.findOne({ where: { id: userId } });
+    const user = await this.userRepo
+      .createQueryBuilder('user')
+      .addSelect('user.password')
+      .where('user.id = :userId', { userId })
+      .getOne();
 
     if (!user) {
       throw new NotFoundException('User not found');

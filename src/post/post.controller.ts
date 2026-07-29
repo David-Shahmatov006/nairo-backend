@@ -12,13 +12,16 @@ import {
   Query,
   Patch,
   ParseUUIDPipe,
+  ParseIntPipe,
+  DefaultValuePipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import {} from 'multer';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { PostService } from './post.service';
 import { R2Service } from 'src/r2.service';
 import { UpdatePostDto } from './dto/update-post.dto';
+import { imageUploadOptions } from 'src/common/upload.utils';
+
 @UseGuards(JwtAuthGuard)
 @Controller('posts')
 export class PostController {
@@ -28,7 +31,7 @@ export class PostController {
   ) {}
 
   @Post('create')
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(FileInterceptor('image', imageUploadOptions))
   async createPost(
     @UploadedFile() file: Express.Multer.File,
     @Body() body: { title: string; description: string },
@@ -46,44 +49,42 @@ export class PostController {
 
   @Delete(':id')
   async deletePost(@Req() req, @Param('id') postId: string) {
-    const userId = req.user.id;
-    const post = await this.postService.getPostInfo(postId, userId);
-    const result = await this.postService.deletePost(postId, userId);
+    const result = await this.postService.deletePost(postId, req.user.id);
 
-    if (post && post.image) {
-      await this.r2Service.deleteFile(post.image);
+    if (result.image) {
+      await this.r2Service.deleteFile(result.image);
     }
 
-    return result;
+    return { success: result.success };
   }
 
   @Get('/saved')
   async getSavedPosts(
     @Req() req,
-    @Query('page') page: string,
-    @Query('limit') limit: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
   ) {
-    return this.postService.getSavedPosts(req.user.id, +page, +limit);
+    return this.postService.getSavedPosts(req.user.id, page, limit);
   }
 
   @Get('/all')
   async getAllPosts(
     @Req() req,
-    @Query('page') page: string,
-    @Query('limit') limit: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
   ) {
-    return this.postService.getAllPosts(req.user.id, +page, +limit);
+    return this.postService.getAllPosts(req.user.id, page, limit);
   }
 
   @Get('/user/:id')
   async getUserPosts(
     @Param('id') userId: string,
     @Req() req,
-    @Query('page') page: string,
-    @Query('limit') limit: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
   ) {
     const currentUserId = req.user.id;
-    return this.postService.getUserPosts(userId, currentUserId, +page, +limit);
+    return this.postService.getUserPosts(userId, currentUserId, page, limit);
   }
 
   @Get('/:id')
@@ -92,7 +93,7 @@ export class PostController {
   }
 
   @Patch(':id')
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(FileInterceptor('image', imageUploadOptions))
   async updatePost(
     @Param('id') postId: string,
     @UploadedFile() file: Express.Multer.File,

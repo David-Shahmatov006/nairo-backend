@@ -15,6 +15,7 @@ import { UserService } from './user.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { R2Service } from 'src/r2.service';
+import { imageUploadOptions } from 'src/common/upload.utils';
 
 @Controller('user')
 export class UserController {
@@ -32,19 +33,25 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard)
   @Post('avatar')
-  @UseInterceptors(FileInterceptor('avatar'))
+  @UseInterceptors(FileInterceptor('avatar', imageUploadOptions))
   async uploadAvatar(@UploadedFile() file: Express.Multer.File, @Req() req) {
     const userId = req.user.id;
-    const currentUser = await this.userService.getUserById(userId, userId);
+    const currentUser = await this.userService.getUserAvatar(userId);
 
     const avatarUrl = await this.r2Service.uploadFile(file, 'avatars');
     const updatedUser = await this.userService.updateAvatar(userId, avatarUrl);
 
-    if (currentUser && currentUser.avatar) {
+    if (currentUser?.avatar) {
       await this.r2Service.deleteFile(currentUser.avatar);
     }
 
     return updatedUser;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('search/:query')
+  async searchUsers(@Param('query') query: string) {
+    return this.userService.searchUsers(query);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -82,12 +89,6 @@ export class UserController {
   @Post('/:id/follow')
   toggleFollow(@Req() req, @Param('id') targetUserId: string) {
     return this.userService.toggleFollow(req.user.id, targetUserId);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Get('search/:query')
-  async searchUsers(@Param('query') query: string) {
-    return this.userService.searchUsers(query);
   }
 
   @Post('/check')

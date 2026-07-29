@@ -10,6 +10,7 @@ import { Repository } from 'typeorm';
 import { User } from 'src/user/entities/user.entity';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { R2Service } from 'src/r2.service';
+import { clampPagination } from 'src/common/upload.utils';
 
 @Injectable()
 export class PostService {
@@ -20,6 +21,61 @@ export class PostService {
     private userRepo: Repository<User>,
     private r2Service: R2Service,
   ) {}
+
+  private async getViewerFlags(userId: string, postIds: string[]) {
+    if (!postIds.length) {
+      return {
+        savedIds: new Set<string>(),
+        likedIds: new Set<string>(),
+      };
+    }
+
+    const [savedRows, likedRows]: [
+      Array<{ postId: string }>,
+      Array<{ postId: string }>,
+    ] = await Promise.all([
+      this.userRepo.query(
+        `
+          SELECT "postId"
+          FROM user_saved_posts_post
+          WHERE "userId" = $1 AND "postId" = ANY($2)
+        `,
+        [userId, postIds],
+      ),
+      this.userRepo.query(
+        `
+          SELECT "postId"
+          FROM user_liked_posts_post
+          WHERE "userId" = $1 AND "postId" = ANY($2)
+        `,
+        [userId, postIds],
+      ),
+    ]);
+
+    return {
+      savedIds: new Set(savedRows.map((row) => row.postId)),
+      likedIds: new Set(likedRows.map((row) => row.postId)),
+    };
+  }
+
+  private async getLikesCountMap(postIds: string[]) {
+    if (!postIds.length) {
+      return new Map<string, number>();
+    }
+
+    const rows: Array<{ postId: string; count: string }> =
+      await this.postRepo.query(
+        `
+          SELECT "postId", COUNT(*)::int AS count
+          FROM user_liked_posts_post
+          WHERE "postId" = ANY($1)
+          GROUP BY "postId"
+        `,
+        [postIds],
+      );
+
+    return new Map(rows.map((row) => [row.postId, Number(row.count)]));
+  }
 
   async createPost(
     userId: string,
@@ -87,136 +143,125 @@ export class PostService {
     page: number,
     limit: number,
   ) {
+    const { page: safePage, limit: safeLimit } = clampPagination(page, limit);
+
     const posts = await this.postRepo.find({
       where: { user: { id: userId } },
-      relations: ['user', 'likedBy'],
+      relations: ['user'],
       order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
+      skip: (safePage - 1) * safeLimit,
+      take: safeLimit,
     });
 
-    const viewer = await this.userRepo.findOne({
-      where: { id: currentUserId },
-      relations: ['savedPosts', 'likedPosts'],
-    });
-
-    if (!viewer) throw new NotFoundException('Viewer not found');
-
-    const savedIds = new Set(viewer.savedPosts.map((p) => p.id));
-    const likedIds = new Set(viewer.likedPosts.map((p) => p.id));
+    const postIds = posts.map((post) => post.id);
+    const [{ savedIds, likedIds }, likesMap] = await Promise.all([
+      this.getViewerFlags(currentUserId, postIds),
+      this.getLikesCountMap(postIds),
+    ]);
 
     const data = posts.map((post) => ({
       ...post,
       isSaved: savedIds.has(post.id),
       isLiked: likedIds.has(post.id),
-      likes: post.likedBy.length,
+      likes: likesMap.get(post.id) ?? 0,
     }));
+
     return {
       posts: data,
-      hasMore: data.length === limit,
+      hasMore: data.length === safeLimit,
     };
   }
 
   async getAllPosts(userId: string, page: number, limit: number) {
+    const { page: safePage, limit: safeLimit } = clampPagination(page, limit);
+
     const posts = await this.postRepo
       .createQueryBuilder('post')
       .innerJoinAndSelect('post.user', 'user')
-      .leftJoinAndSelect('post.likedBy', 'likedBy')
       .orderBy('post.createdAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit)
+      .skip((safePage - 1) * safeLimit)
+      .take(safeLimit)
       .getMany();
 
-    const user = await this.userRepo.findOne({
-      where: { id: userId },
-      relations: ['savedPosts', 'likedPosts', 'savedPosts.likedBy'],
-    });
-
-    if (!user) throw new NotFoundException("Post wasn't found");
-
-    const savedIds = new Set(user.savedPosts.map((p) => p.id));
-    const likedIds = new Set(user.likedPosts.map((p) => p.id));
+    const postIds = posts.map((post) => post.id);
+    const [{ savedIds, likedIds }, likesMap] = await Promise.all([
+      this.getViewerFlags(userId, postIds),
+      this.getLikesCountMap(postIds),
+    ]);
 
     const data = posts.map((post) => ({
       ...post,
       isSaved: savedIds.has(post.id),
       isLiked: likedIds.has(post.id),
-      likes: post.likedBy.length,
+      likes: likesMap.get(post.id) ?? 0,
     }));
 
     return {
       posts: data,
-      hasMore: data.length === limit,
+      hasMore: data.length === safeLimit,
     };
   }
 
   async getSavedPosts(userId: string, page: number, limit: number) {
+    const { page: safePage, limit: safeLimit } = clampPagination(page, limit);
+
     const posts = await this.postRepo
       .createQueryBuilder('post')
       .innerJoin('post.savedBy', 'savedBy', 'savedBy.id = :userId', { userId })
       .leftJoinAndSelect('post.user', 'user')
-      .leftJoinAndSelect('post.likedBy', 'likedBy')
       .orderBy('post.createdAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit)
+      .skip((safePage - 1) * safeLimit)
+      .take(safeLimit)
       .getMany();
 
-    const user = await this.userRepo.findOne({
-      where: { id: userId },
-      relations: ['likedPosts'],
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    const likedIds = new Set(user.likedPosts.map((p) => p.id));
+    const postIds = posts.map((post) => post.id);
+    const [{ likedIds }, likesMap] = await Promise.all([
+      this.getViewerFlags(userId, postIds),
+      this.getLikesCountMap(postIds),
+    ]);
 
     const data = posts.map((post) => ({
       ...post,
       isSaved: true,
       isLiked: likedIds.has(post.id),
-      likes: post.likedBy.length,
+      likes: likesMap.get(post.id) ?? 0,
     }));
 
     return {
       posts: data,
-      hasMore: data.length === limit,
+      hasMore: data.length === safeLimit,
     };
   }
 
   async getPostInfo(postId: string, userId: string) {
     const post = await this.postRepo.findOne({
       where: { id: postId },
-      relations: ['user', 'likedBy'],
+      relations: ['user'],
     });
 
     if (!post) throw new NotFoundException("Post wasn't found");
 
-    const user = await this.userRepo.findOne({
-      where: { id: userId },
-      relations: ['savedPosts', 'likedPosts'],
-    });
-
-    if (!user) throw new NotFoundException('User not found');
-
-    const isSaved = user.savedPosts.some((p) => p.id === postId);
-    const isLiked = post.likedBy.some((u) => u.id === userId);
+    const [{ savedIds, likedIds }, likesMap] = await Promise.all([
+      this.getViewerFlags(userId, [postId]),
+      this.getLikesCountMap([postId]),
+    ]);
 
     return {
       ...post,
-      isSaved,
-      isLiked,
-      likes: post.likedBy.length,
+      isSaved: savedIds.has(postId),
+      isLiked: likedIds.has(postId),
+      likes: likesMap.get(postId) ?? 0,
     };
   }
 
   async toggleSavePost(userId: string, postId: string) {
-    const user = await this.userRepo.findOne({
-      where: { id: userId },
-      relations: ['savedPosts'],
-    });
-    const post = await this.postRepo.findOne({ where: { id: postId } });
+    const [user, post] = await Promise.all([
+      this.userRepo.findOne({
+        where: { id: userId },
+        relations: ['savedPosts'],
+      }),
+      this.postRepo.findOne({ where: { id: postId } }),
+    ]);
 
     if (!user || !post) throw new NotFoundException('Not found');
 
@@ -230,8 +275,7 @@ export class PostService {
       post.savings++;
     }
 
-    await this.postRepo.save(post);
-    await this.userRepo.save(user);
+    await Promise.all([this.postRepo.save(post), this.userRepo.save(user)]);
 
     return { saved: !alreadySaved };
   }
@@ -257,16 +301,9 @@ export class PostService {
 
     await this.postRepo.save(post);
 
-    const updatedPost = await this.postRepo.findOne({
-      where: { id: postId },
-      relations: ['likedBy'],
-    });
-
-    if (!updatedPost) throw new NotFoundException('Post not found');
-
     return {
       isLiked: !alreadyLiked,
-      likes: updatedPost.likedBy.length,
+      likes: post.likedBy.length,
     };
   }
 
@@ -282,8 +319,9 @@ export class PostService {
       throw new ForbiddenException('You cannot delete this post');
     }
 
+    const image = post.image;
     await this.postRepo.remove(post);
 
-    return { success: true };
+    return { success: true, image };
   }
 }
