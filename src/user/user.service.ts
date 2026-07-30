@@ -14,7 +14,7 @@ export class UserService {
   constructor(
     @InjectRepository(User)
     private userRepo: Repository<User>,
-  ) {}
+  ) { }
 
   async updateProfile(userId: string, data: any) {
     const user = await this.userRepo.findOne({ where: { id: userId } });
@@ -93,11 +93,13 @@ export class UserService {
     oldPassword: string,
     newPassword: string,
   ) {
-    const user = await this.userRepo
-      .createQueryBuilder('user')
-      .addSelect('user.password')
-      .where('user.id = :userId', { userId })
-      .getOne();
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
+      select: {
+        id: true,
+        password: true,
+      },
+    });
 
     if (!user) {
       throw new NotFoundException('User not found');
