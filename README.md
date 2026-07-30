@@ -101,6 +101,7 @@ Powered by Socket.IO
 ### Database
 - PostgreSQL
 - TypeORM
+- Redis
 
 ### Authentication
 - JWT
@@ -130,7 +131,7 @@ Powered by Socket.IO
 
 ## 🗄️ Database
 
-The project uses PostgreSQL with TypeORM.
+The project uses PostgreSQL with TypeORM and Redis for temporary password reset secrets.
 
 Features include:
 
@@ -176,6 +177,27 @@ Used for:
 - Post images
 
 Files are uploaded directly to Cloudflare R2 and served from the configured public bucket/domain.
+
+---
+
+## 🧪 Local Infrastructure
+
+To run PostgreSQL, Redis, and pgAdmin locally:
+
+```bash
+docker compose up -d
+```
+
+Default local Redis connection:
+
+- `REDIS_HOST=127.0.0.1`
+- `REDIS_PORT=6379`
+
+Production Redis connection:
+
+- `REDIS_URL=redis://...`
+
+Password reset flow stores OTP codes and one-time reset tokens in Redis with TTL, so they are no longer persisted in PostgreSQL.
 ---
 
 ## 📌 Highlights

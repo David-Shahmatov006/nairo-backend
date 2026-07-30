@@ -1,4 +1,3 @@
-import { PasswordReset } from 'src/password_resets/entities/password_resets.entity';
 import { Post } from 'src/post/entities/post.entity';
 import {
   Entity,
@@ -7,7 +6,6 @@ import {
   ManyToMany,
   JoinTable,
   OneToMany,
-  ManyToOne,
 } from 'typeorm';
 
 @Entity()
@@ -60,7 +58,4 @@ export class User {
 
   @OneToMany(() => Post, (post) => post.user)
   posts: Post[];
-
-  @OneToMany(() => PasswordReset, (pr) => pr.user)
-  passwordResets: PasswordReset[];
 }

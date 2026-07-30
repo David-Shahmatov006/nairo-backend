@@ -1,9 +1,9 @@
-import { Body, Controller, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Patch, Post } from '@nestjs/common';
 import { PasswordResetsService } from './password_resets.service';
 import { GenerateOTPDto } from './dto/generateOTP.dto';
 import { VerifyOTPDto } from './dto/verifyOTP.dto';
 import { ResetPasswordDto } from './dto/resetPassword.dto';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -21,7 +21,7 @@ import {
 export class PasswordResetsController {
   constructor(private readonly passwordResetsService: PasswordResetsService) {}
 
-  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 3, ttl: 10 * 60 * 1000 } })
   @Post('generate-otp')
   @ApiOperation({ summary: 'Generate and send a password reset OTP' })
   @ApiBody({ type: GenerateOTPDto })
@@ -31,6 +31,7 @@ export class PasswordResetsController {
     return this.passwordResetsService.createResetCode(dto.email);
   }
 
+  @Throttle({ default: { limit: 10, ttl: 60 * 1000 } })
   @Post('verify-otp')
   @ApiOperation({ summary: 'Verify the OTP and issue a password reset token' })
   @ApiBody({ type: VerifyOTPDto })
@@ -40,6 +41,7 @@ export class PasswordResetsController {
     return this.passwordResetsService.verifyCode(dto.email, dto.code);
   }
 
+  @Throttle({ default: { limit: 5, ttl: 10 * 60 * 1000 } })
   @Patch('/reset')
   @ApiOperation({ summary: 'Reset password using a reset token' })
   @ApiBody({ type: ResetPasswordDto })

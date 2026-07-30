@@ -1,16 +1,22 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Resend } from 'resend';
 
 @Injectable()
 export class MailService {
+  private readonly logger = new Logger(MailService.name);
   private resend = new Resend(process.env.RESEND_API_KEY);
 
   async sendResetCode(email: string, code: string) {
-    await this.resend.emails.send({
-      from: 'Nairo <onboarding@resend.dev>',
-      to: email,
-      subject: 'Reset your Nairo password',
-      html: `
+    try {
+      const { error } = await this.resend.emails.send({
+        from: 'Nairo <onboarding@resend.dev>',
+        to: email,
+        subject: 'Reset your Nairo password',
+        html: `
         <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -172,6 +178,28 @@ All rights reserved.
 </body>
 </html>
       `,
-    });
+      });
+
+      if (error) {
+        this.logger.error(
+          `Resend rejected password reset email for ${email}: ${error.name} - ${error.message}`,
+        );
+        throw new ServiceUnavailableException(
+          'Password reset email could not be sent',
+        );
+      }
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
+
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to send password reset email for ${email}: ${message}`,
+      );
+      throw new ServiceUnavailableException(
+        'Password reset email could not be sent',
+      );
+    }
   }
 }

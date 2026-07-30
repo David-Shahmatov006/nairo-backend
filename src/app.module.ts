@@ -9,6 +9,7 @@ import { CommentModule } from './comment/comment.module';
 import { ChatModule } from './chat/chat.module';
 import { PasswordResetsModule } from './password_resets/password_resets.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
       ],
     }),
 
+    RedisModule,
     AuthModule,
     UserModule,
     PostModule,

@@ -1,28 +1,46 @@
 import {
-  Injectable,
   BadRequestException,
-  NotFoundException,
+  Injectable,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { randomBytes } from 'crypto';
-import { PasswordReset } from './entities/password_resets.entity';
+import { createHash, randomBytes } from 'crypto';
 import { User } from 'src/user/entities/user.entity';
 import { MailService } from './mail/mail.service';
 import { ResetPasswordDto } from './dto/resetPassword.dto';
+import { RedisService } from 'src/redis/redis.service';
+
+const OTP_TTL_SECONDS = 10 * 60;
+const RESET_TOKEN_TTL_SECONDS = 10 * 60;
+
+type PasswordResetOtpPayload = {
+  userId: string;
+  email: string;
+  codeHash: string;
+};
 
 @Injectable()
 export class PasswordResetsService {
   constructor(
-    @InjectRepository(PasswordReset)
-    private resetRepo: Repository<PasswordReset>,
-
     @InjectRepository(User)
     private userRepo: Repository<User>,
 
     private mailService: MailService,
+    private redisService: RedisService,
   ) {}
+
+  private getOtpKey(userId: string) {
+    return `password-reset:otp:${userId}`;
+  }
+
+  private getResetTokenKey(userId: string) {
+    return `password-reset:token:${userId}`;
+  }
+
+  private hashResetToken(token: string) {
+    return createHash('sha256').update(token).digest('hex');
+  }
 
   async createResetCode(email: string) {
     const user = await this.userRepo.findOne({
@@ -37,11 +55,12 @@ export class PasswordResetsService {
 
     const codeHash = await bcrypt.hash(code, 10);
 
-    await this.resetRepo.save({
-      user,
+    await this.redisService.del(this.getResetTokenKey(user.id));
+    await this.redisService.setJson(this.getOtpKey(user.id), {
+      userId: user.id,
+      email: user.email,
       codeHash,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-    });
+    } satisfies PasswordResetOtpPayload, OTP_TTL_SECONDS);
 
     await this.mailService.sendResetCode(email, code);
 
@@ -57,35 +76,30 @@ export class PasswordResetsService {
       throw new BadRequestException('If user exists, email was sent');
     }
 
-    const reset = await this.resetRepo.findOne({
-      where: {
-        user: { id: user.id },
-        usedAt: IsNull(),
-      },
-      order: { createdAt: 'DESC' },
-    });
+    const otpKey = this.getOtpKey(user.id);
+    const otpPayload =
+      await this.redisService.getJson<PasswordResetOtpPayload>(otpKey);
 
-    if (!reset) {
+    if (!otpPayload || otpPayload.email !== user.email) {
       throw new BadRequestException('Invalid code');
     }
 
-    if (reset.expiresAt < new Date()) {
-      throw new BadRequestException('Code expired');
-    }
-
-    const isValid = await bcrypt.compare(code, reset.codeHash);
+    const isValid = await bcrypt.compare(code, otpPayload.codeHash);
 
     if (!isValid) {
       throw new BadRequestException('Invalid code');
     }
 
+    await this.redisService.del(otpKey);
+
     const resetToken = randomBytes(32).toString('hex');
+    const resetTokenHash = this.hashResetToken(resetToken);
 
-    const resetTokenHash = await bcrypt.hash(resetToken, 10);
-
-    reset.codeHash = resetTokenHash;
-
-    await this.resetRepo.save(reset);
+    await this.redisService.set(
+      this.getResetTokenKey(user.id),
+      resetTokenHash,
+      RESET_TOKEN_TTL_SECONDS,
+    );
 
     return { resetToken };
   }
@@ -100,37 +114,21 @@ export class PasswordResetsService {
 
     if (!user) throw new BadRequestException('Invalid request');
 
-    const reset = await this.resetRepo.findOne({
-      where: {
-        user: { id: user.id },
-        usedAt: IsNull(),
-      },
-      order: {
-        createdAt: 'DESC',
-      },
-    });
+    const resetTokenHash = this.hashResetToken(resetToken);
+    const tokenWasConsumed = await this.redisService.consumeIfMatches(
+      this.getResetTokenKey(user.id),
+      resetTokenHash,
+    );
 
-    const isValid = await bcrypt.compare(resetToken, reset?.codeHash);
-
-    if (!isValid) {
+    if (!tokenWasConsumed) {
       throw new BadRequestException('Invalid token');
-    }
-
-    if (!reset) {
-      throw new BadRequestException('Invalid token');
-    }
-
-    if (reset.expiresAt < new Date()) {
-      throw new BadRequestException('Token expired');
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     user.password = hashedPassword;
-    reset.usedAt = new Date();
 
     await this.userRepo.save(user);
-    await this.resetRepo.save(reset);
 
     return { message: 'Password updated successfully!' };
   }
