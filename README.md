@@ -204,6 +204,7 @@ Password reset flow stores OTP codes and one-time reset tokens in Redis with TTL
 
 - ✅ NestJS Architecture
 - ✅ PostgreSQL + TypeORM
+- ✅ Redis for password reset OTP / tokens
 - ✅ JWT Authentication
 - ✅ Refresh Tokens
 - ✅ Cookie-based Authentication

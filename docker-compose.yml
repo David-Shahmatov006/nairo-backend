@@ -3,7 +3,7 @@ version: '3.9'
 services:
   postgres:
     image: postgres:15
-    container_name: nairo_backend
+    container_name: nairo_postgres
     restart: always
     environment:
       POSTGRES_USER: postgres
