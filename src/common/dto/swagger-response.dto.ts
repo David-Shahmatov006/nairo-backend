@@ -79,6 +79,9 @@ export class AuthResponseDto {
 
   @ApiProperty({ example: 'jwt-access-token' })
   accessToken: string;
+
+  @ApiPropertyOptional({ example: ['early_bird'], type: [String] })
+  newlyUnlocked?: string[];
 }
 
 export class AccessTokenResponseDto {
@@ -125,6 +128,27 @@ export class CheckUserFieldsResponseDto {
 
   @ApiProperty({ example: true })
   usernameExists: boolean;
+}
+
+export class EmailExistsResponseDto {
+  @ApiProperty({ example: true })
+  exists: boolean;
+}
+
+export class AchievementItemDto {
+  @ApiProperty({ example: 'night_owl' })
+  key: string;
+
+  @ApiProperty({ example: true })
+  unlocked: boolean;
+}
+
+export class VisitAchievementsResponseDto {
+  @ApiProperty({ type: () => AchievementItemDto, isArray: true })
+  achievements: AchievementItemDto[];
+
+  @ApiProperty({ example: ['halloween'], type: [String] })
+  newlyUnlocked: string[];
 }
 
 export class ResetTokenResponseDto {

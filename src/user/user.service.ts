@@ -8,12 +8,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { AchievementsService } from './achievements/achievements.service';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User)
     private userRepo: Repository<User>,
+    private achievementsService: AchievementsService,
   ) { }
 
   async updateProfile(userId: string, data: any) {
@@ -121,10 +123,21 @@ export class UserService {
       throw new NotFoundException('User not found');
     }
 
+    const previousLanguage = user.preferredLanguage;
+
     user.preferredLanguage = language;
     await this.userRepo.save(user);
 
-    return user;
+    const granted = await this.achievementsService.evaluatePolyglot(
+      userId,
+      previousLanguage,
+      language,
+    );
+
+    return {
+      ...user,
+      newlyUnlocked: granted ? (['polyglot'] as const) : [],
+    };
   }
 
   async toggleFollow(currentUserId: string, targetUserId: string) {
@@ -141,7 +154,6 @@ export class UserService {
     if (!currentUser || !targetUser)
       throw new NotFoundException('User not found');
 
-    // FIX: если пустые массивы — создаём их
     currentUser.following = currentUser.following ?? [];
     targetUser.followers = targetUser.followers ?? [];
 
@@ -150,7 +162,6 @@ export class UserService {
     );
 
     if (isFollowing) {
-      // ⛔ UNFOLLOW
       currentUser.following = currentUser.following.filter(
         (u) => u.id !== targetUserId,
       );
@@ -159,7 +170,6 @@ export class UserService {
         (u) => u.id !== currentUserId,
       );
     } else {
-      // ✅ FOLLOW
       currentUser.following.push(targetUser);
       targetUser.followers.push(currentUser);
     }
@@ -201,5 +211,11 @@ export class UserService {
       emailExists: !!emailExists,
       usernameExists: !!usernameExists,
     };
+  }
+
+  async isEmailExists(email: string) {
+    const user = await this.userRepo.findOne({ where: { email } });
+
+    return { exists: !!user };
   }
 }

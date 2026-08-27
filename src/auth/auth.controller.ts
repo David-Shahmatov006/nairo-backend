@@ -59,6 +59,7 @@ export class AuthController {
       message: result.message,
       user: result.user,
       accessToken: result.accessToken,
+      newlyUnlocked: result.newlyUnlocked,
     };
   }
 

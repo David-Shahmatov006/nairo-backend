@@ -6,6 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { User } from 'src/user/entities/user.entity';
 import { LoginDto } from './dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
+import { AchievementsService } from 'src/user/achievements/achievements.service';
 
 @Injectable()
 export class AuthService {
@@ -13,6 +14,7 @@ export class AuthService {
     @InjectRepository(User)
     private userRepo: Repository<User>,
     private jwtService: JwtService,
+    private achievementsService: AchievementsService,
   ) {}
 
   private generateAccessToken(user: User) {
@@ -74,6 +76,10 @@ export class AuthService {
 
     const savedUser = await this.userRepo.save(user);
 
+    const granted = await this.achievementsService.evaluateEarlyBird(
+      savedUser.id,
+    );
+
     const accessToken = this.generateAccessToken(savedUser);
     const refreshToken = this.generateRefreshToken(savedUser);
 
@@ -84,6 +90,7 @@ export class AuthService {
       user: userWithoutPassword,
       accessToken,
       refreshToken,
+      newlyUnlocked: granted ? (['early_bird'] as const) : [],
     };
   }
 

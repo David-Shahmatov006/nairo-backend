@@ -73,6 +73,7 @@ export class PostController {
           format: 'binary',
           description: 'Image file up to 5 MB',
         },
+        timeZone: { type: 'string', example: 'Europe/Kyiv' },
       },
     },
   })
@@ -91,6 +92,7 @@ export class PostController {
       body.title,
       body.description,
       imageUrl,
+      body.timeZone,
     );
   }
 

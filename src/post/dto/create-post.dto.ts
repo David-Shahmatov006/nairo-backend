@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreatePostDto {
   @ApiProperty({ example: 'My first post', maxLength: 200 })
@@ -13,4 +13,10 @@ export class CreatePostDto {
   @IsNotEmpty()
   @MaxLength(1000)
   description: string;
+
+  @ApiPropertyOptional({ example: 'Europe/Kyiv', maxLength: 64 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  timeZone?: string;
 }

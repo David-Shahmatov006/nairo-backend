@@ -19,7 +19,9 @@ import { imageUploadOptions } from 'src/common/upload.utils';
 import { ChangeEmailDto } from './dto/change-email.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ChangeLanguageDto } from './dto/change-language.dto';
-import { CheckUserFieldsDto } from './dto/check-user-fields.dto';
+import { CheckEmailDto, CheckUserFieldsDto } from './dto/check-user-fields.dto';
+import { VisitDto } from './dto/visit.dto';
+import { AchievementsService } from './achievements/achievements.service';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -33,11 +35,14 @@ import {
 } from '@nestjs/swagger';
 import {
   CheckUserFieldsResponseDto,
+  EmailExistsResponseDto,
   MessageResponseDto,
   PublicUserDto,
   ToggleFollowResponseDto,
   UserProfileDto,
   UserSummaryDto,
+  AchievementItemDto,
+  VisitAchievementsResponseDto,
 } from 'src/common/dto/swagger-response.dto';
 
 @ApiTags('Users')
@@ -46,6 +51,7 @@ export class UserController {
   constructor(
     private readonly userService: UserService,
     private readonly r2Service: R2Service,
+    private readonly achievementsService: AchievementsService,
   ) {}
 
   @UseGuards(JwtAuthGuard)
@@ -105,6 +111,37 @@ export class UserController {
   @ApiUnauthorizedResponse({ description: 'Access token is missing or invalid' })
   async searchUsers(@Param('query') query: string) {
     return this.userService.searchUsers(query);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('visit')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Record a visit and evaluate date-based achievements',
+  })
+  @ApiBody({ type: VisitDto })
+  @ApiOkResponse({ type: VisitAchievementsResponseDto })
+  @ApiUnauthorizedResponse({
+    description: 'Access token is missing or invalid',
+  })
+  @ApiBadRequestResponse({
+    description: 'Validation failed or time zone is invalid',
+  })
+  visit(@Req() req, @Body() dto: VisitDto) {
+    return this.achievementsService.evaluateVisit(req.user.id, dto.timeZone);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/achievements')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get achievements for a user' })
+  @ApiParam({ name: 'id', example: '8f9719ff-c08f-4d3f-886a-d9be7c2ee55a' })
+  @ApiOkResponse({ type: AchievementItemDto, isArray: true })
+  @ApiUnauthorizedResponse({
+    description: 'Access token is missing or invalid',
+  })
+  getAchievements(@Param('id') id: string) {
+    return this.achievementsService.list(id);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -179,5 +216,14 @@ export class UserController {
   @ApiBadRequestResponse({ description: 'Validation failed' })
   async checkUserFields(@Body() dto: CheckUserFieldsDto) {
     return this.userService.checkUserFields(dto);
+  }
+
+  @Post('/is-email-exists')
+  @ApiOperation({ summary: 'Check whether email is already taken' })
+  @ApiBody({ type: CheckEmailDto })
+  @ApiOkResponse({ type: EmailExistsResponseDto })
+  @ApiBadRequestResponse({ description: 'Validation failed' })
+  async isEmailExists(@Body() dto: CheckEmailDto) {
+    return this.userService.isEmailExists(dto.email);
   }
 }

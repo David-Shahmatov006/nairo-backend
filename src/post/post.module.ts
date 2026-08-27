@@ -9,7 +9,8 @@ import { R2Service } from 'src/r2.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Post, User])
+    TypeOrmModule.forFeature([Post, User]),
+    UserModule,
   ],
   controllers: [PostController],
   providers: [PostService, R2Service],

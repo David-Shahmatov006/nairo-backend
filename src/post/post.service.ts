@@ -11,6 +11,7 @@ import { User } from 'src/user/entities/user.entity';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { R2Service } from 'src/r2.service';
 import { clampPagination } from 'src/common/upload.utils';
+import { AchievementsService } from 'src/user/achievements/achievements.service';
 
 @Injectable()
 export class PostService {
@@ -20,6 +21,7 @@ export class PostService {
     @InjectRepository(User)
     private userRepo: Repository<User>,
     private r2Service: R2Service,
+    private achievementsService: AchievementsService,
   ) {}
 
   private async getViewerFlags(userId: string, postIds: string[]) {
@@ -82,6 +84,7 @@ export class PostService {
     title: string,
     description: string,
     image: string,
+    timeZone?: string,
   ) {
     const user = await this.userRepo.findOne({ where: { id: userId } });
 
@@ -98,11 +101,21 @@ export class PostService {
     const post = this.postRepo.create({
       title,
       description,
-      image: image,
+      image,
       user,
     });
 
-    return this.postRepo.save(post);
+    const savedPost = await this.postRepo.save(post);
+    const granted = await this.achievementsService.evaluateNightOwl(
+      userId,
+      savedPost.createdAt,
+      timeZone,
+    );
+
+    return {
+      ...savedPost,
+      newlyUnlocked: granted ? (['night_owl'] as const) : [],
+    };
   }
 
   async updatePost(

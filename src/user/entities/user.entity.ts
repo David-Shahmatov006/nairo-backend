@@ -6,6 +6,7 @@ import {
   ManyToMany,
   JoinTable,
   OneToMany,
+  CreateDateColumn,
 } from 'typeorm';
 
 @Entity()
@@ -38,6 +39,12 @@ export class User {
 
   @Column({ default: 'en' })
   preferredLanguage: string;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  createdAt: Date;
+
+  @Column({ type: 'jsonb', default: [] })
+  unlockedAchievements: string[];
 
   @ManyToMany(() => User, (user) => user.following, { onDelete: 'CASCADE' })
   @JoinTable({
