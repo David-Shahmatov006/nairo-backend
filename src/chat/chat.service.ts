@@ -9,6 +9,16 @@ import { Chat } from './entities/chat.entity';
 import { Message } from './entities/message.entity';
 import { User } from 'src/user/entities/user.entity';
 import { In, Repository } from 'typeorm';
+import { R2Service } from 'src/r2.service';
+
+export type MessageContent =
+  | { type: 'text'; text: string }
+  | {
+      type: 'voice';
+      audioUrl: string;
+      durationMs: number;
+      waveform: number[];
+    };
 
 @Injectable()
 export class ChatService {
@@ -16,6 +26,7 @@ export class ChatService {
     @InjectRepository(Chat) private chatRepo: Repository<Chat>,
     @InjectRepository(Message) private messageRepo: Repository<Message>,
     @InjectRepository(User) private userRepo: Repository<User>,
+    private readonly r2Service: R2Service,
   ) {}
 
   async readMessages(chatId: string, userId: string) {
@@ -97,7 +108,7 @@ export class ChatService {
     chatId: string | null,
     senderId: string,
     receiverId: string,
-    text: string,
+    content: MessageContent,
   ) {
     let chat: Chat | null = null;
 
@@ -135,7 +146,15 @@ export class ChatService {
     }
 
     const message = this.messageRepo.create({
-      text,
+      ...(content.type === 'text'
+        ? { type: 'text' as const, text: content.text }
+        : {
+            type: 'voice' as const,
+            text: null,
+            audioUrl: content.audioUrl,
+            durationMs: content.durationMs,
+            waveform: content.waveform,
+          }),
       sender,
       chat,
     });
@@ -160,6 +179,10 @@ export class ChatService {
 
     if (message.sender.id !== userId)
       throw new ForbiddenException("You can't edit this message");
+
+    if (message.type === 'voice') {
+      throw new BadRequestException("Voice messages can't be edited");
+    }
 
     if (!newText.trim()) {
       throw new BadRequestException('Message cannot be empty');
@@ -187,6 +210,10 @@ export class ChatService {
       throw new ForbiddenException("You can't delete this message");
 
     await this.messageRepo.delete(messageId);
+
+    if (message.type === 'voice' && message.audioUrl) {
+      await this.r2Service.deleteFile(message.audioUrl);
+    }
 
     return message;
   }

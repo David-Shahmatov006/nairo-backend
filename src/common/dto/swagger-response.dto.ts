@@ -244,8 +244,27 @@ export class MessageDto {
   })
   id: string;
 
-  @ApiProperty({ example: 'Hello there' })
-  text: string;
+  @ApiProperty({ example: 'text', enum: ['text', 'voice'] })
+  type: 'text' | 'voice';
+
+  @ApiProperty({ example: 'Hello there', nullable: true })
+  text: string | null;
+
+  @ApiPropertyOptional({
+    example: 'https://cdn.example.com/voice-messages/voice.webm',
+    nullable: true,
+  })
+  audioUrl?: string | null;
+
+  @ApiPropertyOptional({ example: 4200, nullable: true })
+  durationMs?: number | null;
+
+  @ApiPropertyOptional({
+    example: [0, 12, 48, 100, 72, 30],
+    type: [Number],
+    nullable: true,
+  })
+  waveform?: number[] | null;
 
   @ApiProperty({ type: () => UserSummaryDto })
   sender: UserSummaryDto;
@@ -271,7 +290,8 @@ export class ChatDto {
 
   @ApiProperty({
     example: {
-      '8f9719ff-c08f-4d3f-886a-d9be7c2ee55a': 'a8b9e3d0-ae53-43f4-bb93-42cad3283db4',
+      '8f9719ff-c08f-4d3f-886a-d9be7c2ee55a':
+        'a8b9e3d0-ae53-43f4-bb93-42cad3283db4',
     },
     additionalProperties: { type: 'string' },
   })

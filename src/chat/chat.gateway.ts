@@ -8,6 +8,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { ChatService } from './chat.service';
 import { NotFoundException } from '@nestjs/common';
+import { Message } from './entities/message.entity';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -42,46 +43,64 @@ export class ChatGateway {
       payload.chatId ?? null,
       payload.senderId,
       payload.receiverId,
-      payload.text,
+      { type: 'text', text: payload.text },
     );
 
     const saved = result.message;
 
     if (!saved) throw new NotFoundException('Message not found');
 
+    await this.broadcastNewMessage(
+      result.chatId,
+      saved,
+      payload.senderId,
+      payload.receiverId,
+    );
+  }
+
+  async broadcastNewMessage(
+    chatId: string,
+    message: Message,
+    senderId: string,
+    receiverId: string,
+  ) {
     const messageToSend = {
-      id: saved.id,
-      chatId: result.chatId,
-      text: saved.text,
-      sender: saved.sender,
-      createdAt: saved.createdAt.toISOString(),
+      id: message.id,
+      chatId,
+      type: message.type,
+      text: message.text,
+      audioUrl: message.audioUrl,
+      durationMs: message.durationMs,
+      waveform: message.waveform,
+      sender: message.sender,
+      createdAt: message.createdAt.toISOString(),
     };
 
     const receiverSockets = await this.server
-      .in(`user:${payload.receiverId}`)
+      .in(`user:${receiverId}`)
       .fetchSockets();
 
     const receiverIsInChat = receiverSockets.some((socket) =>
-      socket.rooms.has(result.chatId),
+      socket.rooms.has(chatId),
     );
 
     if (receiverIsInChat) {
-      await this.chatService.readMessages(result.chatId, payload.receiverId);
+      await this.chatService.readMessages(chatId, receiverId);
     }
 
-    this.server.to(result.chatId).emit('receiveMessage', messageToSend);
+    this.server.to(chatId).emit('receiveMessage', messageToSend);
+
+    this.server.to(`user:${receiverId}`).emit('newMessageNotification', {
+      ...messageToSend,
+      unread: true,
+    });
 
     this.server
-      .to(`user:${payload.receiverId}`)
-      .emit('newMessageNotification', {
-        ...messageToSend,
-        unread: true,
-      });
+      .to(`user:${senderId}`)
+      .to(`user:${receiverId}`)
+      .emit('newActivity', { chatId });
 
-    this.server
-      .to(`user:${payload.senderId}`)
-      .to(`user:${payload.receiverId}`)
-      .emit('newActivity', { chatId: result.chatId });
+    return messageToSend;
   }
 
   @SubscribeMessage('readMessages')

@@ -10,14 +10,28 @@ import {
 import { User } from '../../user/entities/user.entity';
 import { Chat } from './chat.entity';
 
+export type MessageType = 'text' | 'voice';
+
 @Entity()
 @Index('IDX_message_chatId_createdAt', ['chat', 'createdAt'])
 export class Message {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column('text')
-  text: string;
+  @Column({ type: 'varchar', length: 16, default: 'text' })
+  type: MessageType;
+
+  @Column({ type: 'text', nullable: true })
+  text: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  audioUrl: string | null;
+
+  @Column({ type: 'int', nullable: true })
+  durationMs: number | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  waveform: number[] | null;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'senderId' })

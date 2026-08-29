@@ -12,6 +12,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { extname } from 'path';
 import { fileTypeFromBuffer } from 'file-type';
+import { isAllowedAudioExtension } from './common/upload.utils';
 @Injectable()
 export class R2Service {
   private readonly s3Client: S3Client;
@@ -31,15 +32,46 @@ export class R2Service {
   }
 
   async uploadFile(file: Express.Multer.File, folder: string): Promise<string> {
+    const type = await fileTypeFromBuffer(file.buffer);
+
+    if (!type || !type.mime.startsWith('image/')) {
+      throw new BadRequestException('Only image files are allowed');
+    }
+
+    return this.putObject(
+      file,
+      folder,
+      extname(file.originalname),
+      "We can't save your image =(",
+    );
+  }
+
+  async uploadAudioFile(
+    file: Express.Multer.File,
+    folder: string,
+  ): Promise<string> {
+    const type = await fileTypeFromBuffer(file.buffer);
+
+    if (!isAllowedAudioExtension(type?.ext)) {
+      throw new BadRequestException('Only audio files are allowed');
+    }
+
+    return this.putObject(
+      file,
+      folder,
+      `.${type!.ext}`,
+      "We can't save your voice message =(",
+    );
+  }
+
+  private async putObject(
+    file: Express.Multer.File,
+    folder: string,
+    extension: string,
+    failureMessage: string,
+  ): Promise<string> {
     try {
-      const type = await fileTypeFromBuffer(file.buffer);
-
-      if (!type || !type.mime.startsWith('image/')) {
-        throw new BadRequestException('Only image files are allowed');
-      }
-
       const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-      const extension = extname(file.originalname);
       const key = `${folder}/${uniqueSuffix}${extension}`;
 
       const bucketName = this.configService.get<string>('R2_BUCKET_NAME');
@@ -61,7 +93,7 @@ export class R2Service {
         `Error during uploading on R2: ${err.message}`,
         err.stack,
       );
-      throw new InternalServerErrorException("We can't save your image =(");
+      throw new InternalServerErrorException(failureMessage);
     }
   }
 
