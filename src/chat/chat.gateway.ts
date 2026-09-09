@@ -198,4 +198,20 @@ export class ChatGateway {
       isTyping: payload.isTyping,
     });
   }
+
+  @SubscribeMessage('recording')
+  handleRecording(
+    @ConnectedSocket() client,
+    @MessageBody()
+    payload: {
+      chatId: string;
+      userId: string;
+      isRecording: boolean;
+    },
+  ) {
+    client.broadcast.to(payload.chatId).emit('recordingStatus', {
+      userId: payload.userId,
+      isRecording: payload.isRecording,
+    });
+  }
 }
