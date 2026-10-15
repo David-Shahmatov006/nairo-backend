@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { RegisterDto } from './dto/register.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -51,10 +55,8 @@ export class AuthService {
       throw new BadRequestException('Email already registered');
     }
 
-    const usernameExists = await this.userRepo.findOne({
-      where: {
-        username: dto.username,
-      },
+    const usernameExists = await this.userRepo.findOneBy({
+      username: dto.username,
     });
 
     if (usernameExists) {
