@@ -10,9 +10,10 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
-import { extname } from 'path';
 import { fileTypeFromBuffer } from 'file-type';
 import { isAllowedAudioExtension } from './common/upload.utils';
+import { randomUUID } from 'crypto';
+
 @Injectable()
 export class R2Service {
   private readonly s3Client: S3Client;
@@ -39,9 +40,10 @@ export class R2Service {
     }
 
     return this.putObject(
-      file,
+      file.buffer,
+      type.mime,
       folder,
-      extname(file.originalname),
+      `.${type.ext}`,
       "We can't save your image =(",
     );
   }
@@ -57,42 +59,62 @@ export class R2Service {
     }
 
     return this.putObject(
-      file,
+      file.buffer,
+      type!.mime,
       folder,
       `.${type!.ext}`,
       "We can't save your voice message =(",
     );
   }
 
+  async uploadAiImage(buffer: Buffer, userId: string): Promise<string> {
+    const type = await fileTypeFromBuffer(buffer);
+
+    if (!type || !['image/png', 'image/jpeg'].includes(type.mime)) {
+      throw new BadRequestException('Unsupported AI image format');
+    }
+
+    return this.putObject(
+      buffer,
+      type.mime,
+      `ai-temp/${userId}`,
+      `.${type.ext}`,
+      'Failed to upload AI image',
+    );
+  }
+
   private async putObject(
-    file: Express.Multer.File,
+    buffer: Buffer,
+    mimeType: string,
     folder: string,
     extension: string,
     failureMessage: string,
   ): Promise<string> {
     try {
-      const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-      const key = `${folder}/${uniqueSuffix}${extension}`;
+      const key = `${folder}/${randomUUID()}${extension}`;
 
-      const bucketName = this.configService.get<string>('R2_BUCKET_NAME');
-      const publicDomain = this.configService.get<string>('R2_PUBLIC_DOMAIN');
+      const bucketName =
+        this.configService.getOrThrow<string>('R2_BUCKET_NAME');
 
-      const command = new PutObjectCommand({
-        Bucket: bucketName,
-        Key: key,
-        Body: file.buffer,
-        ContentType: file.mimetype,
-      });
+      const publicDomain = this.configService
+        .getOrThrow<string>('R2_PUBLIC_DOMAIN')
+        .replace(/\/$/, '');
 
-      await this.s3Client.send(command);
+      await this.s3Client.send(
+        new PutObjectCommand({
+          Bucket: bucketName,
+          Key: key,
+          Body: buffer,
+          ContentType: mimeType,
+        }),
+      );
 
       return `${publicDomain}/${key}`;
     } catch (error) {
       const err = error as Error;
-      this.logger.error(
-        `Error during uploading on R2: ${err.message}`,
-        err.stack,
-      );
+
+      this.logger.error(`Error uploading to R2: ${err.message}`, err.stack);
+
       throw new InternalServerErrorException(failureMessage);
     }
   }
