@@ -14,6 +14,7 @@ import { R2Service } from 'src/r2.service';
   ],
   controllers: [PostController],
   providers: [PostService, R2Service],
+  exports: [PostService],
 })
 
 export class PostModule {}

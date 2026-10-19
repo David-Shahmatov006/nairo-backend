@@ -4,6 +4,8 @@ import { AiService } from './ai.service';
 import { ImproveTextDto } from './dto/improveText.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { GeneratePostDto } from './dto/generatePost.dto';
+import { AgentDto } from './agent/dto/agent.dto';
+import { AgentService } from './agent/agent.service';
 
 interface AuthenticatedRequest extends Request {
   user: { id: string };
@@ -12,12 +14,16 @@ interface AuthenticatedRequest extends Request {
 @UseGuards(JwtAuthGuard)
 @Controller('ai')
 export class AiController {
-  constructor(private readonly aiService: AiService) {}
+  constructor(
+    private readonly aiService: AiService,
+    private readonly agentService: AgentService,
+  ) {}
 
   @Post('improve-text')
   improveText(@Body() dto: ImproveTextDto) {
     return this.aiService.improveText(dto.text);
   }
+
   @Post('generate-post')
   async generateFullPost(
     @Body() dto: GeneratePostDto,
@@ -28,5 +34,11 @@ export class AiController {
       req.user.id,
       dto.withImage,
     );
+  }
+
+  @Post('agent/chat')
+  @UseGuards(JwtAuthGuard)
+  async agentChat(@Body() body: AgentDto, @Req() req: AuthenticatedRequest) {
+    return this.agentService.chat(body.message, req.user.id);
   }
 }
