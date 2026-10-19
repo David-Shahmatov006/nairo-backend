@@ -39,6 +39,6 @@ export class AiController {
   @Post('agent/chat')
   @UseGuards(JwtAuthGuard)
   async agentChat(@Body() body: AgentDto, @Req() req: AuthenticatedRequest) {
-    return this.agentService.chat(body.message, req.user.id);
+    return this.agentService.chat(body.message, req.user.id, body.history);
   }
 }

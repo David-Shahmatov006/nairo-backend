@@ -4,7 +4,7 @@ export const agentTools: FunctionDeclaration[] = [
   {
     name: 'searchUsers',
     description:
-      'Search Nairo users by username, first name, last name or full name.',
+      'Search Nairo users by username, first name or last name.Usernames may be written in Latin characters. If a user searches for a Cyrillic name, try a Latin transliteration if the original search returns no results.',
     parameters: {
       type: Type.OBJECT,
       properties: {

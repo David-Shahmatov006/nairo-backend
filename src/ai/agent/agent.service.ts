@@ -4,6 +4,8 @@ import { Content, GoogleGenAI, Part } from '@google/genai';
 import { PostService } from 'src/post/post.service';
 import { UserService } from 'src/user/user.service';
 import { agentTools } from './agent-tools';
+import { RedisService } from 'src/redis/redis.service';
+import { AgentHistoryMessageDto } from './dto/agent.dto';
 
 @Injectable()
 export class AgentService {
@@ -14,6 +16,7 @@ export class AgentService {
     private readonly configService: ConfigService,
     private readonly postsService: PostService,
     private readonly usersService: UserService,
+    private readonly redisService: RedisService,
   ) {
     this.ai = new GoogleGenAI({
       apiKey: this.configService.getOrThrow<string>('GEMINI_NAIRO_KEY'),
@@ -94,13 +97,38 @@ export class AgentService {
     }));
   }
 
-  async chat(message: string, currentUserId: string) {
-    const contents: Content[] = [
-      {
-        role: 'user',
-        parts: [{ text: message }],
-      },
-    ];
+  async chat(
+    message: string,
+    currentUserId: string,
+    visibleHistory?: AgentHistoryMessageDto[],
+  ) {
+    const historyKey = `ai:chat:${currentUserId}:default`;
+
+    const history = await this.redisService.getJson<Content[]>(historyKey);
+
+    const cached: Content[] = Array.isArray(history) ? history : [];
+    const lastReply = cached
+      .at(-1)
+      ?.parts?.map((part) => part.text ?? '')
+      .join('')
+      .trim();
+    const lastVisibleReply = visibleHistory?.at(-1);
+    // Preserve tool results when the cache matches the conversation on screen.
+    const useCached =
+      visibleHistory === undefined ||
+      (lastVisibleReply?.role === 'assistant' &&
+        lastVisibleReply.content.trim() === lastReply);
+    const contents: Content[] = useCached
+      ? cached
+      : (visibleHistory ?? []).map((entry) => ({
+          role: entry.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: entry.content }],
+        }));
+
+    contents.push({
+      role: 'user',
+      parts: [{ text: message }],
+    });
 
     for (let step = 0; step < 5; step++) {
       const response = await this.ai.models.generateContent({
@@ -118,6 +146,11 @@ export class AgentService {
           The post route is /post/, never /posts/.
           If multiple users match a name and the intended user
           is ambiguous, ask the user to clarify.
+          Resolve follow-up selections such as "the second one" using the order
+          of the options in your previous reply and the earlier tool results.
+          Do not search for ordinal selections as if they were user names.
+          When listing matching users, include a profile link for each option
+          so the conversation retains their exact IDs.
           Respond in the same language as the user.
         `,
           tools: [{ functionDeclarations: agentTools }],
@@ -127,8 +160,25 @@ export class AgentService {
       const functionCalls = response.functionCalls ?? [];
 
       if (!functionCalls.length) {
+        const reply = response.text?.trim();
+
+        if (!reply) {
+          throw new Error('Gemini returned an empty response');
+        }
+
+        const modelContent = response.candidates?.[0]?.content;
+
+        contents.push(
+          modelContent ?? {
+            role: 'model',
+            parts: [{ text: reply }],
+          },
+        );
+
+        await this.redisService.setJson(historyKey, contents, 60 * 60 * 24);
+
         return {
-          message: response.text ?? '',
+          message: reply,
         };
       }
 
@@ -165,7 +215,8 @@ export class AgentService {
     }
 
     return {
-      message: 'Unable to complete the request. Please try making it more specific.',
+      message:
+        'Unable to complete the request. Please try making it more specific.',
     };
   }
 }
