@@ -1,39 +1,68 @@
 import { FunctionDeclaration, Type } from '@google/genai';
+import { AI_INSTRUCTIONS } from '../ai.instructions';
+import { supportedAgentLanguages } from './types/agent-actions';
+export { supportedAgentLanguages } from './types/agent-actions';
+
 
 export const agentTools: FunctionDeclaration[] = [
   {
     name: 'searchUsers',
-    description:
-      'Search Nairo users by username, first name or last name.Usernames may be written in Latin characters. If a user searches for a Cyrillic name, try a Latin transliteration if the original search returns no results.',
+    description: AI_INSTRUCTIONS.SEARCH_USERS,
     parameters: {
       type: Type.OBJECT,
       properties: {
-        query: {
-          type: Type.STRING,
-          description:
-            'Extract only the name or username from the user request. Do not include conversational phrases.',
+        queries: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: AI_INSTRUCTIONS.SEARCH_QUERIES,
         },
       },
-      required: ['query'],
+      required: ['queries'],
     },
   },
   {
     name: 'getUserPosts',
-    description:
-      'Get posts published by a specific user. If userId is omitted, get the current user posts.',
+    description: AI_INSTRUCTIONS.GET_USER_POSTS,
     parameters: {
       type: Type.OBJECT,
       properties: {
         userId: {
           type: Type.STRING,
-          description: 'ID of the user whose posts should be retrieved.',
+          description: AI_INSTRUCTIONS.POSTS_USER_ID,
         },
         limit: {
           type: Type.INTEGER,
-          description: 'Number of posts to retrieve, between 1 and 10.',
+          description: AI_INSTRUCTIONS.POSTS_LIMIT,
         },
       },
       required: ['limit'],
+    },
+  },
+  {
+    name: 'controlInterface',
+    description: AI_INSTRUCTIONS.CONTROL_INTERFACE,
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        actions: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              type: {
+                type: Type.STRING,
+                enum: ['setTheme', 'setLanguage', 'openCreatePost'],
+              },
+              value: {
+                type: Type.STRING,
+                description: AI_INSTRUCTIONS.ACTION_VALUE,
+              },
+            },
+            required: ['type'],
+          },
+        },
+      },
+      required: ['actions'],
     },
   },
 ];

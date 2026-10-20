@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Post, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { AiService } from './ai.service';
 import { ImproveTextDto } from './dto/improveText.dto';
@@ -37,8 +37,13 @@ export class AiController {
   }
 
   @Post('agent/chat')
-  @UseGuards(JwtAuthGuard)
   async agentChat(@Body() body: AgentDto, @Req() req: AuthenticatedRequest) {
     return this.agentService.chat(body.message, req.user.id, body.history);
+  }
+
+  @Delete('agent/chat')
+  async clearAgentChat(@Req() req: AuthenticatedRequest) {
+    await this.agentService.clearHistory(req.user.id);
+    return { success: true };
   }
 }

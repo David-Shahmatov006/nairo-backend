@@ -1,11 +1,14 @@
+import { AI_INSTRUCTIONS } from '../ai.instructions';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Content, GoogleGenAI, Part } from '@google/genai';
 import { PostService } from 'src/post/post.service';
 import { UserService } from 'src/user/user.service';
-import { agentTools } from './agent-tools';
+import { agentTools, supportedAgentLanguages } from './agent-tools';
 import { RedisService } from 'src/redis/redis.service';
 import { AgentHistoryMessageDto } from './dto/agent.dto';
+
+import type { AgentAction } from './types/agent-actions';
 
 @Injectable()
 export class AgentService {
@@ -25,6 +28,46 @@ export class AgentService {
     this.model = this.configService.getOrThrow<string>('GEMINI_FLASH_MODEL');
   }
 
+  async clearHistory(currentUserId: string): Promise<void> {
+    await this.redisService.del(`ai:chat:${currentUserId}:default`);
+  }
+
+  private validateActions(value: unknown): AgentAction[] {
+    if (!Array.isArray(value)) return [];
+
+    return value.slice(0, 5).flatMap((item: unknown): AgentAction[] => {
+      if (!item || typeof item !== 'object') return [];
+
+      const action = item as Record<string, unknown>;
+      const language = supportedAgentLanguages.find((code) => code === action.value);
+
+      if (
+        action.type === 'setLanguage' &&
+        language !== undefined
+      ) {
+        return [
+          {
+            type: 'setLanguage',
+            value: language,
+          },
+        ];
+      }
+
+      if (
+        action.type === 'setTheme' &&
+        (action.value === 'dark' || action.value === 'light')
+      ) {
+        return [{ type: 'setTheme', value: action.value }];
+      }
+
+      if (action.type === 'openCreatePost') {
+        return [{ type: 'openCreatePost' }];
+      }
+
+      return [];
+    });
+  }
+
   private async executeTool(
     name: string,
     args: Record<string, unknown>,
@@ -32,11 +75,21 @@ export class AgentService {
   ) {
     switch (name) {
       case 'searchUsers': {
-        if (typeof args.query !== 'string') {
-          return { error: 'Invalid search query' };
+        if (!Array.isArray(args.queries)) {
+          return { error: 'Invalid search queries' };
         }
 
-        return this.searchUsers(args.query);
+        const queries = args.queries
+          .filter((q): q is string => typeof q === 'string')
+          .map((q) => q.trim().slice(0, 100))
+          .filter(Boolean)
+          .slice(0, 5);
+
+        if (!queries.length) {
+          return { error: 'Empty search queries' };
+        }
+
+        return this.searchUsers(queries);
       }
 
       case 'getUserPosts': {
@@ -60,20 +113,25 @@ export class AgentService {
     }
   }
 
-  async searchUsers(query: string) {
-    const safeQuery = query.trim().slice(0, 100);
+  async searchUsers(queries: string[]) {
+    const results = await Promise.all(
+      queries.map((query) => this.usersService.searchUsers(query)),
+    );
 
-    if (!safeQuery) return [];
+    const uniqueUsers = new Map();
 
-    const users = await this.usersService.searchUsers(safeQuery);
+    for (const users of results) {
+      for (const user of users) {
+        uniqueUsers.set(user.id, {
+          id: user.id,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        });
+      }
+    }
 
-    return users.slice(0, 10).map((user) => ({
-      id: user.id,
-      username: user.username,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      avatar: user.avatar,
-    }));
+    return [...uniqueUsers.values()].slice(0, 10);
   }
 
   async getUserPosts(currentUserId: string, userId?: string, limit = 5) {
@@ -103,8 +161,8 @@ export class AgentService {
     visibleHistory?: AgentHistoryMessageDto[],
   ) {
     const historyKey = `ai:chat:${currentUserId}:default`;
-
     const history = await this.redisService.getJson<Content[]>(historyKey);
+    const pendingActions: AgentAction[] = [];
 
     const cached: Content[] = Array.isArray(history) ? history : [];
     const lastReply = cached
@@ -113,7 +171,6 @@ export class AgentService {
       .join('')
       .trim();
     const lastVisibleReply = visibleHistory?.at(-1);
-    // Preserve tool results when the cache matches the conversation on screen.
     const useCached =
       visibleHistory === undefined ||
       (lastVisibleReply?.role === 'assistant' &&
@@ -135,24 +192,7 @@ export class AgentService {
         model: this.model,
         contents,
         config: {
-          systemInstruction: `
-          You are Nairo AI, an assistant for the Nairo social network.
-          Help users find people and posts.
-          Use tools when you need real data from Nairo.
-          Never invent users, posts, or statistics.
-          Link to posts using Markdown with relative URLs: [title](/post/POST_ID).
-          Link to user profiles using [name](/user/USER_ID).
-          Use only IDs returned by tools. Never invent a website domain.
-          The post route is /post/, never /posts/.
-          If multiple users match a name and the intended user
-          is ambiguous, ask the user to clarify.
-          Resolve follow-up selections such as "the second one" using the order
-          of the options in your previous reply and the earlier tool results.
-          Do not search for ordinal selections as if they were user names.
-          When listing matching users, include a profile link for each option
-          so the conversation retains their exact IDs.
-          Respond in the same language as the user.
-        `,
+          systemInstruction: AI_INSTRUCTIONS.AGENT,
           tools: [{ functionDeclarations: agentTools }],
         },
       });
@@ -179,6 +219,7 @@ export class AgentService {
 
         return {
           message: reply,
+          actions: pendingActions,
         };
       }
 
@@ -193,6 +234,39 @@ export class AgentService {
       const toolResponses: Part[] = [];
 
       for (const call of functionCalls) {
+        if (call.name === 'controlInterface') {
+          const actions = this.validateActions(call.args?.actions);
+          const requested: unknown[] = Array.isArray(call.args?.actions) ? call.args.actions : [];
+          const rejected = requested.flatMap((item: unknown) => {
+            if (!item || typeof item !== 'object') return [];
+            const action = item as Record<string, unknown>;
+            if (action.type !== 'setLanguage' || supportedAgentLanguages.some((code) => code === action.value)) return [];
+            return [{
+              type: 'setLanguage',
+              value: typeof action.value === 'string' ? action.value : null,
+              reason: 'unsupported_language',
+            }];
+          });
+
+          pendingActions.push(...actions);
+
+          toolResponses.push({
+            functionResponse: {
+              name: call.name,
+              id: call.id,
+              response: {
+                accepted: actions.length,
+                status: actions.length ? 'pending_frontend_execution' : 'rejected',
+                rejected,
+                supportedLanguages: supportedAgentLanguages,
+                ...(rejected.length ? { instruction: AI_INSTRUCTIONS.UNSUPPORTED_LANGUAGE } : {}),
+              },
+            },
+          });
+
+          continue;
+        }
+
         const result = await this.executeTool(
           call.name ?? '',
           call.args ?? {},
