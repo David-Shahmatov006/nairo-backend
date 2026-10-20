@@ -1,8 +1,55 @@
-# 🚀 Nairo Backend
+# 🚀 Nairo Backend — AI-Powered Social Platform
 
-Backend API for Nairo — a modern social networking platform built with NestJS, TypeScript, PostgreSQL, Redis and Socket.IO.
+Backend API for **Nairo**, an **AI-powered social networking platform** built with **NestJS**, **TypeScript**, **PostgreSQL**, **Redis**, and **Socket.IO**, with **Google Gemini** for conversational assistance and content generation.
 
-The server provides authentication, real-time messaging (text + voice), user management, posts, comments, achievements, notifications, and secure API endpoints.
+The server provides a tool-using AI agent, AI-assisted writing and image generation, authentication, real-time messaging (text + voice), user management, posts, comments, achievements, and notifications.
+
+## 🤖 AI Capabilities
+
+### Conversational agent
+
+Nairo AI uses Gemini function calling to search real platform data and request supported interface actions:
+
+| Tool | Purpose |
+|---|---|
+| `searchUsers` | Find users using name variants, including Cyrillic and Latin spellings |
+| `getUserPosts` | Retrieve posts for the current user or a selected user |
+| `controlInterface` | Request a theme change, supported interface language change, or opening the create-post editor |
+
+The agent returns a text response and optional structured `actions`. The frontend validates and executes those actions. Opening the editor does not publish a post.
+
+Conversation context is cached per authenticated user in Redis with a 24-hour TTL. The frontend also supplies its visible message history; matching cached context preserves tool results so follow-up selections can use the earlier search results. Clearing a conversation deletes its Redis history and the frontend's saved messages and draft.
+
+Model instructions and tool descriptions are centralized in [`src/ai/ai.instructions.ts`](src/ai/ai.instructions.ts). Tool schemas live in [`src/ai/agent/agent-tools.ts`](src/ai/agent/agent-tools.ts). The agent is instructed to use real tool results, link to relative frontend routes, and explain unsupported interface languages without claiming that they were applied.
+
+### Content generation
+
+- **Text improvement** — correct grammar and improve readability while preserving meaning and tone.
+- **Post generation** — turn an idea into a title and description, optionally with an AI-generated image.
+- **Image storage** — generated images are uploaded to Cloudflare R2.
+
+### AI endpoints
+
+All AI routes require JWT authentication.
+
+| Method | Route | Purpose |
+|---|---|---|
+| `POST` | `/ai/agent/chat` | Send a message with optional conversation history; receive `{ message, actions? }` |
+| `DELETE` | `/ai/agent/chat` | Clear the authenticated user's cached agent history |
+| `POST` | `/ai/improve-text` | Improve submitted text |
+| `POST` | `/ai/generate-post` | Generate a post, optionally with an image |
+
+### AI configuration
+
+Configure these variables on the backend alongside the database, Redis, authentication, and R2 settings:
+
+```dotenv
+GEMINI_NAIRO_KEY=<your-gemini-api-key>
+GEMINI_FLASH_MODEL=<text-and-tool-calling-model>
+GEMINI_FLASH_IMAGE_MODEL=<image-generation-model>
+```
+
+Gemini credentials stay on the server. Redis is required for conversation context and the password reset flow.
 
 ---
 
@@ -154,6 +201,12 @@ Unlocked keys are stored in a `jsonb` column on the user, and holiday rules live
 - NestJS
 - TypeScript
 
+### AI
+- Google Gemini via `@google/genai`
+- Function calling for platform tools and interface actions
+- Centralized model instructions
+- Redis conversation context
+
 ### Database
 - PostgreSQL
 - TypeORM
@@ -201,7 +254,7 @@ Unlocked keys are stored in a `jsonb` column on the user, and holiday rules live
 
 ## 🗄️ Database
 
-The project uses PostgreSQL with TypeORM and Redis for temporary password reset secrets.
+The project uses PostgreSQL with TypeORM and Redis for AI conversation context and temporary password reset secrets.
 
 Features include:
 
@@ -244,6 +297,7 @@ Main API modules:
 - Posts (`/posts`)
 - Comments (`/comments`)
 - Chats & Messages (`/chats`)
+- AI agent & content generation (`/ai`)
 - File Uploads
 
 REST API architecture with real-time communication via Socket.IO.
@@ -268,6 +322,7 @@ Used for:
 - User avatars
 - Post images
 - Voice messages
+- AI-generated post images
 
 Files are uploaded directly to Cloudflare R2 and served from the configured public bucket/domain.
 Replaced avatars, deleted post images and failed voice uploads are cleaned up from the bucket.
@@ -338,6 +393,10 @@ npm run test:cov  # coverage report in ./coverage
 
 ## 📌 Highlights
 
+- ✅ Gemini-powered conversational agent with platform tools
+- ✅ AI-assisted writing, post generation, and image generation
+- ✅ Structured frontend actions for theme, language, and the post editor
+- ✅ Conversation context with Redis caching
 - ✅ NestJS Architecture
 - ✅ PostgreSQL + TypeORM + Migrations
 - ✅ Redis for password reset OTP / tokens
