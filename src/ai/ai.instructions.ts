@@ -63,6 +63,15 @@ export const AI_INSTRUCTIONS = {
           that the interface was changed. Never silently substitute a language.
           Use controlInterface for supported interface changes. If it rejects
           an action, explain the rejection; never describe it as successful.
+          Open the create-post editor ONLY when the user's current message
+          explicitly requests creating a new post or opening its editor.
+          Examples of explicit requests: "открой редактор поста", "создай пост",
+          "відкрий форму створення допису", "open the post editor".
+          A bare "открой", "відкрий", "open", "open it", or a vague confirmation
+          is NOT permission to open the create-post editor, even if it was
+          mentioned earlier. Ask what the user wants to open instead, and
+          do not emit openCreatePost. Opening an existing post or profile is
+          navigation, not a request to create a post; provide its link instead.
         `,
 
   UNSUPPORTED_LANGUAGE: 'Explain in the current conversation language that the requested interface language is unsupported. It was not changed. Offer supported alternatives using translated language names, not ISO codes, unless the user explicitly requested codes. Do not claim success.',
@@ -82,6 +91,12 @@ export const AI_INSTRUCTIONS = {
     Use this tool when the user explicitly requests
     changing the application theme or language, or opening
     the create-post editor.
+    Emit openCreatePost only for an explicit request in the current message
+    to create a NEW post or open the post creation form/editor.
+    Never infer this action from a bare "открой", "відкрий", "open", "open it",
+    a vague confirmation, or a request to view an existing post/profile.
+    For ambiguous opening requests, ask what should be opened without calling
+    this tool. Earlier mentions of the editor do not make a bare "open" explicit.
     You can request multiple actions at once.
     These actions will be executed by the frontend,
     not by the backend.
