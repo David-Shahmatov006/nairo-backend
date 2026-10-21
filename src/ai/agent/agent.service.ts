@@ -28,10 +28,6 @@ export class AgentService {
     this.model = this.configService.getOrThrow<string>('GEMINI_FLASH_MODEL');
   }
 
-  async clearHistory(currentUserId: string): Promise<void> {
-    await this.redisService.del(`ai:chat:${currentUserId}:default`);
-  }
-
   private validateActions(value: unknown): AgentAction[] {
     if (!Array.isArray(value)) return [];
 
@@ -39,12 +35,11 @@ export class AgentService {
       if (!item || typeof item !== 'object') return [];
 
       const action = item as Record<string, unknown>;
-      const language = supportedAgentLanguages.find((code) => code === action.value);
+      const language = supportedAgentLanguages.find(
+        (code) => code === action.value,
+      );
 
-      if (
-        action.type === 'setLanguage' &&
-        language !== undefined
-      ) {
+      if (action.type === 'setLanguage' && language !== undefined) {
         return [
           {
             type: 'setLanguage',
@@ -108,9 +103,51 @@ export class AgentService {
         );
       }
 
+      case 'searchWeb': {
+        if (typeof args.query !== 'string') {
+          return { error: 'Invalid search query' };
+        }
+
+        const query = args.query.trim().slice(0, 200);
+
+        if (!query) {
+          return { error: 'Empty search query' };
+        }
+
+        return this.searchWeb(query);
+      }
+
       default:
         return { error: `Unknown tool: ${name}` };
     }
+  }
+
+  private async searchWeb(query: string) {
+    const response = await this.ai.models.generateContent({
+      model: this.configService.getOrThrow<string>('GEMINI_FLASH_MODEL'),
+      contents: query,
+      config: {
+        tools: [{ googleSearch: {} }],
+        systemInstruction: AI_INSTRUCTIONS.SEARCH_WEB,
+      },
+    });
+
+    const grounding = response.candidates?.[0]?.groundingMetadata;
+
+    return {
+      message: response.text ?? '',
+      sources:
+        grounding?.groundingChunks
+          ?.filter((chunk) => chunk.web?.uri)
+          .map((chunk) => ({
+            title: chunk.web?.title,
+            url: chunk.web?.uri,
+          })) ?? [],
+    };
+  }
+
+  async clearHistory(currentUserId: string): Promise<void> {
+    await this.redisService.del(`ai:chat:${currentUserId}:default`);
   }
 
   async searchUsers(queries: string[]) {
@@ -236,16 +273,24 @@ export class AgentService {
       for (const call of functionCalls) {
         if (call.name === 'controlInterface') {
           const actions = this.validateActions(call.args?.actions);
-          const requested: unknown[] = Array.isArray(call.args?.actions) ? call.args.actions : [];
+          const requested: unknown[] = Array.isArray(call.args?.actions)
+            ? call.args.actions
+            : [];
           const rejected = requested.flatMap((item: unknown) => {
             if (!item || typeof item !== 'object') return [];
             const action = item as Record<string, unknown>;
-            if (action.type !== 'setLanguage' || supportedAgentLanguages.some((code) => code === action.value)) return [];
-            return [{
-              type: 'setLanguage',
-              value: typeof action.value === 'string' ? action.value : null,
-              reason: 'unsupported_language',
-            }];
+            if (
+              action.type !== 'setLanguage' ||
+              supportedAgentLanguages.some((code) => code === action.value)
+            )
+              return [];
+            return [
+              {
+                type: 'setLanguage',
+                value: typeof action.value === 'string' ? action.value : null,
+                reason: 'unsupported_language',
+              },
+            ];
           });
 
           pendingActions.push(...actions);
@@ -256,10 +301,14 @@ export class AgentService {
               id: call.id,
               response: {
                 accepted: actions.length,
-                status: actions.length ? 'pending_frontend_execution' : 'rejected',
+                status: actions.length
+                  ? 'pending_frontend_execution'
+                  : 'rejected',
                 rejected,
                 supportedLanguages: supportedAgentLanguages,
-                ...(rejected.length ? { instruction: AI_INSTRUCTIONS.UNSUPPORTED_LANGUAGE } : {}),
+                ...(rejected.length
+                  ? { instruction: AI_INSTRUCTIONS.UNSUPPORTED_LANGUAGE }
+                  : {}),
               },
             },
           });

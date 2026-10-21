@@ -3,7 +3,6 @@ import { AI_INSTRUCTIONS } from '../ai.instructions';
 import { supportedAgentLanguages } from './types/agent-actions';
 export { supportedAgentLanguages } from './types/agent-actions';
 
-
 export const agentTools: FunctionDeclaration[] = [
   {
     name: 'searchUsers',
@@ -63,6 +62,20 @@ export const agentTools: FunctionDeclaration[] = [
         },
       },
       required: ['actions'],
+    },
+  },
+  {
+    name: 'searchWeb',
+    description: AI_INSTRUCTIONS.SEARCH_WEB,
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        query: {
+          type: Type.STRING,
+          description: 'The search query to look up on the web',
+        },
+      },
+      required: ['query'],
     },
   },
 ];

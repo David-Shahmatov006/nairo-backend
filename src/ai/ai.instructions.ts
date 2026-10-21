@@ -74,13 +74,17 @@ export const AI_INSTRUCTIONS = {
           navigation, not a request to create a post; provide its link instead.
         `,
 
-  UNSUPPORTED_LANGUAGE: 'Explain in the current conversation language that the requested interface language is unsupported. It was not changed. Offer supported alternatives using translated language names, not ISO codes, unless the user explicitly requested codes. Do not claim success.',
+  UNSUPPORTED_LANGUAGE:
+    'Explain in the current conversation language that the requested interface language is unsupported. It was not changed. Offer supported alternatives using translated language names, not ISO codes, unless the user explicitly requested codes. Do not claim success.',
 
-  SEARCH_USERS: 'Search Nairo users by username, first name or last name. Support names written in Cyrillic and Latin.',
+  SEARCH_USERS:
+    'Search Nairo users by username, first name or last name. Support names written in Cyrillic and Latin.',
 
-  SEARCH_QUERIES: 'Search variants of the same name, including original spelling, transliterations and common equivalents. Example: Вася, Vasya, Vasia, Vasyl.',
+  SEARCH_QUERIES:
+    'Search variants of the same name, including original spelling, transliterations and common equivalents. Example: Вася, Vasya, Vasia, Vasyl.',
 
-  GET_USER_POSTS: 'Get posts published by a specific user. If userId is omitted, get the current user posts.',
+  GET_USER_POSTS:
+    'Get posts published by a specific user. If userId is omitted, get the current user posts.',
 
   POSTS_USER_ID: 'ID of the user whose posts should be retrieved.',
 
@@ -110,4 +114,20 @@ export const AI_INSTRUCTIONS = {
   `,
 
   ACTION_VALUE: `For setTheme: light or dark. For setLanguage: ISO code from ${supportedAgentLanguages.join(', ')}.`,
+
+  SEARCH_WEB: `
+    Search the internet for current information.
+
+    Use this tool when the user asks about:
+    - Latest news and events
+    - Recent technology updates
+    - Current facts or information
+    - External documentation or websites
+
+    Do not use this tool for searching Nairo users or posts.
+    Use Nairo's internal tools for that.
+    Answer using information found through Google Search.
+    Prefer reliable sources.
+    Do not invent facts or URLs.
+    Respond in the user's language.`,
 } as const;
