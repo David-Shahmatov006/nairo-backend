@@ -1,6 +1,5 @@
 import { FunctionDeclaration, Type } from '@google/genai';
 import { AI_INSTRUCTIONS } from '../ai.instructions';
-import { supportedAgentLanguages } from './types/agent-actions';
 export { supportedAgentLanguages } from './types/agent-actions';
 
 export const agentTools: FunctionDeclaration[] = [
@@ -50,7 +49,7 @@ export const agentTools: FunctionDeclaration[] = [
             properties: {
               type: {
                 type: Type.STRING,
-                enum: ['setTheme', 'setLanguage', 'openCreatePost'],
+                enum: ['setTheme', 'setLanguage', 'openCreatePost', 'setMusic'],
               },
               value: {
                 type: Type.STRING,

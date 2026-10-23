@@ -38,7 +38,10 @@ export class AiController {
 
   @Post('agent/chat')
   async agentChat(@Body() body: AgentDto, @Req() req: AuthenticatedRequest) {
-    return this.agentService.chat(body.message, req.user.id, body.history);
+    return this.agentService.chat(body.message, req.user.id, body.history, {
+      available: body.musicAvailable ?? false,
+      enabled: body.musicEnabled ?? false,
+    });
   }
 
   @Delete('agent/chat')

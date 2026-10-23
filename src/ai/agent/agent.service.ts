@@ -59,6 +59,13 @@ export class AgentService {
         return [{ type: 'openCreatePost' }];
       }
 
+      if (
+        action.type === 'setMusic' &&
+        (action.value === 'on' || action.value === 'off')
+      ) {
+        return [{ type: 'setMusic', value: action.value }];
+      }
+
       return [];
     });
   }
@@ -96,11 +103,7 @@ export class AgentService {
           return { error: 'Invalid limit' };
         }
 
-        return this.getUserPosts(
-          currentUserId,
-          args.userId as string | undefined,
-          args.limit,
-        );
+        return this.getUserPosts(currentUserId, args.userId, args.limit);
       }
 
       case 'searchWeb': {
@@ -155,7 +158,13 @@ export class AgentService {
       queries.map((query) => this.usersService.searchUsers(query)),
     );
 
-    const uniqueUsers = new Map();
+    const uniqueUsers = new Map<
+      string,
+      Pick<
+        (typeof results)[number][number],
+        'id' | 'username' | 'firstName' | 'lastName'
+      >
+    >();
 
     for (const users of results) {
       for (const user of users) {
@@ -196,6 +205,10 @@ export class AgentService {
     message: string,
     currentUserId: string,
     visibleHistory?: AgentHistoryMessageDto[],
+    music: { available: boolean; enabled: boolean } = {
+      available: false,
+      enabled: false,
+    },
   ) {
     const historyKey = `ai:chat:${currentUserId}:default`;
     const history = await this.redisService.getJson<Content[]>(historyKey);
@@ -229,7 +242,7 @@ export class AgentService {
         model: this.model,
         contents,
         config: {
-          systemInstruction: AI_INSTRUCTIONS.AGENT,
+          systemInstruction: `${AI_INSTRUCTIONS.AGENT}\nApp music context at request start: Christmas music available=${music.available}; music setting enabled=${music.enabled}. These are UI preferences, not proof of audible playback.`,
           tools: [{ functionDeclarations: agentTools }],
         },
       });
@@ -272,13 +285,36 @@ export class AgentService {
 
       for (const call of functionCalls) {
         if (call.name === 'controlInterface') {
-          const actions = this.validateActions(call.args?.actions);
+          const actions = this.validateActions(call.args?.actions).filter(
+            (action) =>
+              action.type !== 'setMusic' ||
+              action.value === 'off' ||
+              music.available,
+          );
           const requested: unknown[] = Array.isArray(call.args?.actions)
             ? call.args.actions
             : [];
           const rejected = requested.flatMap((item: unknown) => {
             if (!item || typeof item !== 'object') return [];
             const action = item as Record<string, unknown>;
+            if (action.type === 'setMusic') {
+              const reason =
+                action.value !== 'on' && action.value !== 'off'
+                  ? 'invalid_music_state'
+                  : action.value === 'on' && !music.available
+                    ? 'music_unavailable'
+                    : null;
+              return reason
+                ? [
+                    {
+                      type: 'setMusic',
+                      value:
+                        typeof action.value === 'string' ? action.value : null,
+                      reason,
+                    },
+                  ]
+                : [];
+            }
             if (
               action.type !== 'setLanguage' ||
               supportedAgentLanguages.some((code) => code === action.value)
@@ -307,7 +343,22 @@ export class AgentService {
                 rejected,
                 supportedLanguages: supportedAgentLanguages,
                 ...(rejected.length
-                  ? { instruction: AI_INSTRUCTIONS.UNSUPPORTED_LANGUAGE }
+                  ? {
+                      instruction: [
+                        ...(rejected.some(
+                          (action) => action.type === 'setLanguage',
+                        )
+                          ? [AI_INSTRUCTIONS.UNSUPPORTED_LANGUAGE]
+                          : []),
+                        ...(rejected.some(
+                          (action) => action.type === 'setMusic',
+                        )
+                          ? [
+                              'For music_unavailable, explain that app music is available only with the Christmas seasonal theme. Do not claim music was enabled, and do not change the app theme. For invalid_music_state, use on or off.',
+                            ]
+                          : []),
+                      ].join(' '),
+                    }
                   : {}),
               },
             },

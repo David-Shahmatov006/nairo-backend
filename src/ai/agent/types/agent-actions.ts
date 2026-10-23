@@ -1,5 +1,9 @@
 export type AgentAction =
   | {
+      type: 'setMusic';
+      value: 'on' | 'off';
+    }
+  | {
       type: 'setTheme';
       value: 'light' | 'dark';
     }
@@ -21,7 +25,7 @@ export type AgentAction =
         | 'uk';
     };
 
-
-export const supportedAgentLanguages: Extract<AgentAction, { type: 'setLanguage' }>['value'][] = [
-  'de', 'en', 'uk', 'fr', 'es', 'pl', 'tr', 'it', 'pt', 'ja',
-];
+export const supportedAgentLanguages: Extract<
+  AgentAction,
+  { type: 'setLanguage' }
+>['value'][] = ['de', 'en', 'uk', 'fr', 'es', 'pl', 'tr', 'it', 'pt', 'ja'];
