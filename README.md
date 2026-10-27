@@ -8,15 +8,22 @@ The server provides a tool-using AI agent, AI-assisted writing and image generat
 
 ### Conversational agent
 
-Nairo AI uses Gemini function calling to search real platform data and request supported interface actions:
+Nairon, the Nairo AI agent, uses Gemini function calling to search real platform data, search the web, and request supported interface actions:
 
 | Tool | Purpose |
 |---|---|
 | `searchUsers` | Find users using name variants, including Cyrillic and Latin spellings |
 | `getUserPosts` | Retrieve posts for the current user or a selected user |
-| `controlInterface` | Request a theme change, supported interface language change, or opening the create-post editor |
+| `controlInterface` | Request a theme or supported interface language change, open the create-post editor, or enable/disable seasonal background music |
+| `searchWeb` | Search for current information, news, external documentation, and websites through Gemini with Google Search |
 
 The agent returns a text response and optional structured `actions`. The frontend validates and executes those actions. Opening the editor does not publish a post.
+
+Supported actions are `setTheme` (`light` / `dark`), `setLanguage` (`de`, `en`, `es`, `fr`, `it`, `ja`, `pl`, `pt`, `tr`, `uk`), `openCreatePost`, and `setMusic` (`on` / `off`). Model instructions require an explicit request in the current message to create a new post or open its editor.
+
+Music commands use the frontend-provided `musicAvailable` and `musicEnabled` context. Enabling music is rejected with `music_unavailable` when Christmas music is unavailable; disabling is allowed. The frontend also checks the seasonal theme before enabling music. The command changes a preference; browser autoplay may require a user gesture before audio plays.
+
+Web search makes a separate Gemini request with the `googleSearch` tool using `GEMINI_FLASH_MODEL`. Its answer and source titles/URLs from grounding metadata are returned to the agent as tool results. Nairo users and posts use the internal platform tools.
 
 Conversation context is cached per authenticated user in Redis with a 24-hour TTL. The frontend also supplies its visible message history; matching cached context preserves tool results so follow-up selections can use the earlier search results. Clearing a conversation deletes its Redis history and the frontend's saved messages and draft.
 
@@ -34,10 +41,17 @@ All AI routes require JWT authentication.
 
 | Method | Route | Purpose |
 |---|---|---|
-| `POST` | `/ai/agent/chat` | Send a message with optional conversation history; receive `{ message, actions? }` |
+| `POST` | `/ai/agent/chat` | Send a message with optional history and music context; receive `{ message, actions? }` |
 | `DELETE` | `/ai/agent/chat` | Clear the authenticated user's cached agent history |
 | `POST` | `/ai/improve-text` | Improve submitted text |
 | `POST` | `/ai/generate-post` | Generate a post, optionally with an image |
+
+The chat request accepts:
+
+- `message` — required string, 1–2,000 characters.
+- `history` — optional array of up to 40 `{ role, content }` entries; role is `user` or `assistant`, with up to 20,000 characters per entry.
+- `musicAvailable` — optional boolean indicating whether the frontend has Christmas music available (defaults to `false`).
+- `musicEnabled` — optional boolean for the current music preference (defaults to `false`).
 
 ### AI configuration
 
@@ -204,6 +218,7 @@ Unlocked keys are stored in a `jsonb` column on the user, and holiday rules live
 ### AI
 - Google Gemini via `@google/genai`
 - Function calling for platform tools and interface actions
+- Google Search grounding for web search
 - Centralized model instructions
 - Redis conversation context
 
@@ -395,7 +410,8 @@ npm run test:cov  # coverage report in ./coverage
 
 - ✅ Gemini-powered conversational agent with platform tools
 - ✅ AI-assisted writing, post generation, and image generation
-- ✅ Structured frontend actions for theme, language, and the post editor
+- ✅ Google Search-backed web search
+- ✅ Structured frontend actions for theme, language, the post editor, and seasonal music
 - ✅ Conversation context with Redis caching
 - ✅ NestJS Architecture
 - ✅ PostgreSQL + TypeORM + Migrations
